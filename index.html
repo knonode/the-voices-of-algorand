@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xGov Council Voting Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: rgb(18, 18, 18);
+            color: #20B2AA;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            border-bottom: 2px solid #48D1CC;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #008080;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #20B2AA;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: rgba(32, 178, 170, 0.1);
+            border: 1px solid #48D1CC;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            color: #008080;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            color: #20B2AA;
+            font-size: 0.9rem;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .chart-wrapper {
+            background: rgba(32, 178, 170, 0.05);
+            border: 1px solid #48D1CC;
+            border-radius: 12px;
+            padding: 20px;
+            height: auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            color: #008080;
+            margin-bottom: 15px;
+            text-align: center;
+            flex-shrink: 0; /* Prevent title from shrinking */
+        }
+
+        .chart-wrapper canvas {
+            width: 100% !important;
+            height: 400px !important;
+            display: block;
+            box-sizing: border-box;
+            margin: 0 auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #20B2AA;
+        }
+
+        .error {
+            background: rgba(255, 182, 193, 0.2);
+            border: 1px solid #FFB6C1;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #FFB6C1;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: #20B2AA;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ xGov Council Voting</h1>
+            <p>Real-time visualization of on-chain democratic governance</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3 id="total-votes">-</h3>
+                <p>Total Votes</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="total-stake">-</h3>
+                <p>Total Stake (ALGO)</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="unique-voters">-</h3>
+                <p>Unique Voters</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="participation-rate">-</h3>
+                <p>Participation Rate</p>
+            </div>
+        </div>
+
+        <div id="charts-container" class="charts-container">
+            <div class="loading">Loading voting data...</div>
+        </div>
+
+        <div class="last-updated">
+            Last updated: <span id="last-updated">-</span>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html> 

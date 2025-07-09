@@ -1,0 +1,23 @@
+{
+  "name": "xgov-voting-visualization",
+  "version": "1.0.0",
+  "description": "Real-time visualization of xGov council voting on Algorand",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "chartjs-adapter-date-fns": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0",
+    "@types/node": "^20.8.0"
+  },
+  "keywords": ["algorand", "xgov", "voting", "visualization", "blockchain"],
+  "author": "xGov Voting Visualization",
+  "license": "MIT"
+} 
