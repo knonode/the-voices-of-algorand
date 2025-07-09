@@ -1,11 +1,27 @@
-import { Vote, Candidate, VotingStats, AlgorandTransaction } from './types';
+import { Vote, Candidate, VotingStats, AlgorandTransaction, CommitAmount } from './types';
 import { CANDIDATES } from './candidates';
 import { fetchVotingAccountTransactions, parseVotingOrRegistrationNote, getLatestVotes } from './api';
+
+function parseCommitAmountCSV(csvText: string): Map<string, number> {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const map = new Map<string, number>();
+  for (let i = 1; i < lines.length; i++) { // skip header
+    const cols = lines[i].split(',');
+    if (cols.length < 3) continue;
+    const address = cols[0].trim();
+    const amount = parseInt(cols[2].trim(), 10);
+    if (address && !isNaN(amount)) {
+      map.set(address, amount / 1_000_000); // convert microAlgos to Algos
+    }
+  }
+  return map;
+}
 
 export class VotingService {
   private votes: Vote[] = [];
   private candidates: Map<string, Candidate> = new Map();
   private voterWeights: Map<string, number> = new Map();
+  private commitAmountLoaded = false;
 
   constructor() {
     this.initializeCandidates();
@@ -23,6 +39,15 @@ export class VotingService {
         abstainVotes: 0
       });
     });
+  }
+
+  async loadCommitAmounts(): Promise<void> {
+    if (this.commitAmountLoaded) return;
+    const resp = await fetch('src/commit-amount.csv');
+    const text = await resp.text();
+    this.voterWeights = parseCommitAmountCSV(text);
+    this.commitAmountLoaded = true;
+    console.log(`Loaded ${this.voterWeights.size} voter weights from commit-amount.csv`);
   }
 
   private parseTransaction(tx: AlgorandTransaction): Vote[] {
@@ -59,28 +84,12 @@ export class VotingService {
 
   async fetchAndProcessVotes(): Promise<void> {
     try {
+      await this.loadCommitAmounts();
       console.log('Fetching voting transactions...');
       const transactions = await fetchVotingAccountTransactions();
       console.log(`Found ${transactions.length} transactions`);
 
-      // Registration weights: only use registration notes
-      this.voterWeights = new Map();
-      for (const tx of transactions) {
-        if (tx.note) {
-          const parsed = parseVotingOrRegistrationNote(tx.note);
-          if (parsed.type === 'registration') {
-            // Sum up all amounts (excluding 'com' field)
-            let totalWeight = 0;
-            for (const [key, value] of Object.entries(parsed.data)) {
-              if (key !== 'com' && typeof value === 'number') {
-                totalWeight += value;
-              }
-            }
-            this.voterWeights.set(tx.sender, totalWeight / 1000000);
-          }
-        }
-      }
-      console.log(`Found ${this.voterWeights.size} registered voters`);
+      // voterWeights is now loaded from CSV, do not overwrite
 
       // Use only the latest vote per voter per candidate
       const latestVotesTxs = getLatestVotes(transactions);
