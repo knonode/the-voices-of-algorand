@@ -1,9 +1,11 @@
 import { VotingService } from './votingService';
-import { ChartService } from './chartService';
+import { PlotlyService } from './plotlyService';
+import { PopularityChartService } from './popularityChartService';
+import Plotly from 'plotly.js-dist-min';
 
 class VotingVisualization {
   private votingService: VotingService;
-  private charts: Map<string, any> = new Map();
+  private charts: Map<string, { stakeChart: HTMLElement; popularityChart: HTMLElement }> = new Map();
   private updateInterval: number | null = null;
 
   constructor() {
@@ -15,6 +17,7 @@ class VotingVisualization {
     try {
       await this.loadData();
       this.setupAutoRefresh();
+      this.setupControls();
     } catch (error) {
       this.showError('Failed to initialize voting visualization: ' + error);
     }
@@ -80,10 +83,6 @@ class VotingVisualization {
       const chartAddress = document.createElement('div');
       chartAddress.className = 'chart-address';
       chartAddress.textContent = candidate.address;
-      chartAddress.style.textAlign = 'center';
-      chartAddress.style.color = '#20B2AA';
-      chartAddress.style.fontSize = '0.95rem';
-      chartAddress.style.marginBottom = '10px';
       
       chartWrapper.appendChild(chartTitle);
       chartWrapper.appendChild(chartAddress);
@@ -98,14 +97,53 @@ class VotingVisualization {
         noVotesMsg.textContent = 'No votes yet';
         chartWrapper.appendChild(noVotesMsg);
       } else {
-        const canvas = document.createElement('canvas');
-        chartWrapper.appendChild(canvas);
-        // Create chart
+        // Create charts grid
+        const chartsGrid = document.createElement('div');
+        chartsGrid.className = 'charts-grid';
+        
+        // Create stake chart container
+        const stakeChartContainer = document.createElement('div');
+        stakeChartContainer.className = 'stake-chart';
+        stakeChartContainer.id = `stake-chart-${candidate.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        // Create popularity chart container
+        const popularityChartContainer = document.createElement('div');
+        popularityChartContainer.className = 'popularity-chart';
+        popularityChartContainer.id = `popularity-chart-${candidate.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        chartsGrid.appendChild(stakeChartContainer);
+        chartsGrid.appendChild(popularityChartContainer);
+        chartWrapper.appendChild(chartsGrid);
+        
+        // Store chart containers for later reference
+        this.charts.set(candidate.name, {
+          stakeChart: stakeChartContainer,
+          popularityChart: popularityChartContainer
+        });
+        
+        // Create charts
         const votes = this.votingService.getCandidateVotes(candidate.name);
-        const chart = ChartService.createCandidateChart(canvas, candidate, votes);
-        this.charts.set(candidate.name, chart);
+        PlotlyService.createStakeChart(stakeChartContainer, candidate, votes);
+        PopularityChartService.createPopularityChart(popularityChartContainer, candidate, votes, this.votingService);
       }
+      
       container.appendChild(chartWrapper);
+    });
+  }
+
+  private setupControls(): void {
+    const logScaleToggle = document.getElementById('log-scale-toggle') as HTMLInputElement;
+    if (logScaleToggle) {
+      logScaleToggle.addEventListener('change', (e) => {
+        const useLogScale = (e.target as HTMLInputElement).checked;
+        this.toggleLogScaleOnAllCharts(useLogScale);
+      });
+    }
+  }
+
+  private toggleLogScaleOnAllCharts(useLogScale: boolean): void {
+    this.charts.forEach((chartContainers) => {
+      PlotlyService.toggleLogScale(chartContainers.stakeChart, useLogScale);
     });
   }
 
@@ -145,11 +183,10 @@ class VotingVisualization {
       clearInterval(this.updateInterval);
     }
     
-    // Destroy all charts
-    this.charts.forEach(chart => {
-      if (chart && typeof chart.destroy === 'function') {
-        chart.destroy();
-      }
+    // Clean up Plotly charts
+    this.charts.forEach((chartContainers) => {
+      Plotly.purge(chartContainers.stakeChart);
+      Plotly.purge(chartContainers.popularityChart);
     });
     this.charts.clear();
   }

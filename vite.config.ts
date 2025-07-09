@@ -8,5 +8,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true
+  },
+  optimizeDeps: {
+    exclude: ['buffer']
+  },
+  define: {
+    global: 'globalThis'
   }
 }) 

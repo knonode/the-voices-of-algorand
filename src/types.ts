@@ -50,4 +50,9 @@ export interface ChartData {
     borderColor: string;
     borderWidth: number;
   }[];
+}
+
+export interface CommitAmount {
+  address: string;
+  amount: number;
 } 
