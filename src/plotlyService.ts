@@ -37,7 +37,9 @@ export class PlotlyService {
     const yesData: number[] = [];
     const noData: number[] = [];
     const abstainData: number[] = [];
+    const abstainBase: number[] = [];
     const registry = VotingService.prototype.getVoterRegistry();
+    
     sortedVoters.forEach(([voterId, stakes]) => {
       // Exclude voters with all zero votes
       if (stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0) return;
@@ -47,7 +49,9 @@ export class PlotlyService {
       voters.push(VotingService.truncateAddress(registry.getAddress(voterId)));
       yesData.push(stakes.yes);
       noData.push(-stakes.no); // Negative for downward bars
+      // For abstain: full height but starting from negative half
       abstainData.push(stakes.abstain);
+      abstainBase.push(-stakes.abstain / 2);
     });
 
     const data: any[] = [
@@ -90,6 +94,7 @@ export class PlotlyService {
       {
         x: voters,
         y: abstainData,
+        base: abstainBase,
         type: 'bar',
         name: 'Abstain',
         marker: {
@@ -98,12 +103,16 @@ export class PlotlyService {
         },
         hovertemplate: 
           '<b>Voter:</b> %{customdata}<br>' +
-          '<b>Abstain:</b> %{y:,.2f} ALGO<br>' +
+          '<b>Abstain:</b> %{meta:,.2f} ALGO<br>' +
           '<extra></extra>',
         customdata: sortedVoters
           .filter(([, stakes]) => !(stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0))
           .filter(([, stakes]) => stakes.total >= 10000)
-          .map(([voterId]) => registry.getAddress(voterId))
+          .map(([voterId]) => registry.getAddress(voterId)),
+        meta: sortedVoters
+          .filter(([, stakes]) => !(stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0))
+          .filter(([, stakes]) => stakes.total >= 10000)
+          .map(([, stakes]) => stakes.abstain)
       }
     ];
 
@@ -115,7 +124,7 @@ export class PlotlyService {
           size: 16
         }
       },
-      barmode: 'stack',
+      barmode: 'relative',
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor: 'rgba(0,0,0,0)',
       font: {
