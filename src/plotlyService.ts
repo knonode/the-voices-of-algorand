@@ -50,7 +50,7 @@ export class PlotlyService {
       abstainData.push(stakes.abstain);
     });
 
-    const data: Plotly.Data[] = [
+    const data: any[] = [
       {
         x: voters,
         y: yesData,
@@ -107,7 +107,7 @@ export class PlotlyService {
       }
     ];
 
-    const layout: Partial<Plotly.Layout> = {
+    const layout: any = {
       title: {
         text: candidate.name,
         font: {
@@ -143,7 +143,7 @@ export class PlotlyService {
       hovermode: 'closest'
     };
 
-    const config: Partial<Plotly.Config> = {
+    const config: any = {
       responsive: true,
       displayModeBar: true,
       modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
@@ -168,7 +168,7 @@ export class PlotlyService {
     const noData = candidates.map(c => c.noVotes);
     const abstainData = candidates.map(c => c.abstainVotes);
 
-    const data: Plotly.Data[] = [
+    const data: any[] = [
       {
         x: labels,
         y: yesData,
@@ -201,7 +201,7 @@ export class PlotlyService {
         x: labels,
         y: abstainData,
         type: 'bar',
-        name: 'Abstain',
+        name: 'Abstain Votes',
         marker: {
           color: this.COLORS.abstain,
           line: { color: this.COLORS.border, width: 1 }
@@ -213,12 +213,12 @@ export class PlotlyService {
       }
     ];
 
-    const layout: Partial<Plotly.Layout> = {
+    const layout: any = {
       title: {
-        text: 'Overall Voting Summary',
+        text: 'Voting Summary by Candidate',
         font: {
           color: '#008080',
-          size: 16
+          size: 18
         }
       },
       barmode: 'stack',
@@ -228,23 +228,25 @@ export class PlotlyService {
         color: '#20B2AA'
       },
       xaxis: {
-        tickangle: 45,
         gridcolor: 'rgba(32, 178, 170, 0.1)',
         zeroline: false
       },
       yaxis: {
-        title: 'Stake (ALGO)',
-        type: 'linear',
+        title: 'Total Stake (ALGO)',
         gridcolor: 'rgba(32, 178, 170, 0.1)',
         zeroline: false,
         tickformat: ',.0f'
       },
       showlegend: true,
       legend: {
-        font: { color: '#20B2AA' }
+        x: 0.02,
+        y: 0.98,
+        bgcolor: 'rgba(0,0,0,0.8)',
+        bordercolor: this.COLORS.border,
+        borderwidth: 1
       },
       margin: {
-        l: 60,
+        l: 80,
         r: 20,
         t: 80,
         b: 80
@@ -252,14 +254,14 @@ export class PlotlyService {
       hovermode: 'closest'
     };
 
-    const config: Partial<Plotly.Config> = {
+    const config: any = {
       responsive: true,
       displayModeBar: true,
       modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
       toImageButtonOptions: {
         format: 'png',
         filename: 'voting_summary_chart',
-        height: 400,
+        height: 500,
         width: 800,
         scale: 2
       }
@@ -269,7 +271,7 @@ export class PlotlyService {
   }
 
   static toggleLogScale(container: HTMLElement, useLogScale: boolean): void {
-    const update: Partial<Plotly.Layout> = {
+    const update: any = {
       yaxis: {
         type: useLogScale ? 'log' : 'linear'
       }

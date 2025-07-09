@@ -1,4 +1,4 @@
-import { Vote, Candidate, VotingStats, AlgorandTransaction, CommitAmount } from './types';
+import { Vote, Candidate, VotingStats, AlgorandTransaction } from './types';
 import { CANDIDATES } from './candidates';
 import { fetchVotingAccountTransactions, parseVotingOrRegistrationNote, getLatestVotes } from './api';
 
