@@ -1,4 +1,4 @@
-import { Chart, ChartConfiguration } from 'chart.js/auto';
+import { Chart } from 'chart.js/auto';
 import { Candidate, Vote } from './types';
 import { VotingService } from './votingService';
 
@@ -12,7 +12,7 @@ export class ChartService {
 
   static createCandidateChart(
     canvas: HTMLCanvasElement,
-    candidate: Candidate,
+    _candidate: Candidate,
     votes: Vote[]
   ): Chart {
     // Group votes by voter

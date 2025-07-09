@@ -1,5 +1,4 @@
 import { AlgorandTransaction, AlgorandAccount } from './types';
-import { CANDIDATES } from './candidates';
 
 const NODELY_INDEXER_BASE = 'https://mainnet-idx.4160.nodely.dev';
 const VOTING_ACCOUNT = 'RW466IANOKLA36QARHMBX5VCY3PYDR3H2N5XHPDARG6UBOKCIK7WAMLSCA';
@@ -40,33 +39,7 @@ async function makeIndexerRequest<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
-// Parse registration transaction to extract voting weights
-function parseRegistrationNote(note: string): number {
-  try {
-    const decodedNote = atob(note);
-    if (!decodedNote.startsWith('af/gov1:j')) {
-      return 0;
-    }
-    
-    // Extract JSON part after "af/gov1:j"
-    const jsonStr = decodedNote.substring('af/gov1:j'.length);
-    const registrationData = JSON.parse(jsonStr);
-    
-    // Sum up all amounts (excluding 'com' field)
-    let totalWeight = 0;
-    for (const [key, value] of Object.entries(registrationData)) {
-      if (key !== 'com' && typeof value === 'number') {
-        totalWeight += value;
-      }
-    }
-    
-    // Convert from microAlgos to Algos
-    return totalWeight / 1000000;
-  } catch (error) {
-    console.warn('Failed to parse registration note:', error);
-    return 0;
-  }
-}
+
 
 // Robust note parsing for registration and voting
 export function parseVotingOrRegistrationNote(note: string): { type: 'registration' | 'voting' | 'unknown', data: any } {

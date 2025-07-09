@@ -1,5 +1,5 @@
 import { Vote, Candidate, VotingStats, AlgorandTransaction } from './types';
-import { CANDIDATES, getCandidateByNote, getVoteType } from './candidates';
+import { CANDIDATES } from './candidates';
 import { fetchVotingAccountTransactions, parseVotingOrRegistrationNote, getLatestVotes } from './api';
 
 export class VotingService {
@@ -36,7 +36,6 @@ export class VotingService {
     if (!Array.isArray(arr) || arr.length < CANDIDATES.length + 1) return [];
     
     const votes: Vote[] = [];
-    const candidateIndex = arr[0] - 1; // This is the candidate being voted on (1-based)
     
     // Process votes for all candidates (arr[1] through arr[23])
     for (let i = 0; i < CANDIDATES.length; i++) {
