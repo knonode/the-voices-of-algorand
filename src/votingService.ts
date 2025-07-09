@@ -17,6 +17,32 @@ function parseCommitAmountCSV(csvText: string): Map<string, number> {
   return map;
 }
 
+// Add VoterRegistry for deduplication
+class VoterRegistryImpl {
+  private addressToId = new Map<string, number>();
+  private idToAddress = new Map<number, string>();
+  private nextId = 1;
+
+  getId(address: string): number {
+    if (!this.addressToId.has(address)) {
+      const id = this.nextId++;
+      this.addressToId.set(address, id);
+      this.idToAddress.set(id, address);
+    }
+    return this.addressToId.get(address)!;
+  }
+
+  getAddress(id: number): string {
+    return this.idToAddress.get(id) || '';
+  }
+
+  getAllAddresses(): string[] {
+    return Array.from(this.addressToId.keys());
+  }
+}
+
+const VoterRegistry = new VoterRegistryImpl();
+
 export class VotingService {
   private votes: Vote[] = [];
   private candidates: Map<string, Candidate> = new Map();
@@ -61,6 +87,7 @@ export class VotingService {
     if (!Array.isArray(arr) || arr.length < CANDIDATES.length + 1) return [];
     
     const votes: Vote[] = [];
+    const voterId = VoterRegistry.getId(tx.sender);
     
     // Process votes for all candidates (arr[1] through arr[23])
     for (let i = 0; i < CANDIDATES.length; i++) {
@@ -69,7 +96,7 @@ export class VotingService {
       
       if (voteType) {
         votes.push({
-          voter: tx.sender,
+          voter: voterId, // Use ID
           candidate: CANDIDATES[i].name,
           vote: voteType,
           stake: 0, // Will be populated from registration weights
@@ -103,7 +130,7 @@ export class VotingService {
       // Assign registration weights to votes
       this.votes = parsedVotes.map(vote => ({
         ...vote,
-        stake: this.voterWeights.get(vote.voter) || 0
+        stake: this.voterWeights.get(VoterRegistry.getAddress(vote.voter)) || 0
       }));
 
       // Update candidate data
@@ -177,6 +204,10 @@ export class VotingService {
 
   getVoterWeights(): Map<string, number> {
     return new Map(this.voterWeights);
+  }
+
+  getVoterRegistry() {
+    return VoterRegistry;
   }
 
   // Helper method to truncate account addresses for display

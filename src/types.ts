@@ -1,5 +1,5 @@
 export interface Vote {
-  voter: string;
+  voter: number; // voter ID instead of address string
   candidate: string;
   vote: 'yes' | 'no' | 'abstain';
   stake: number;
@@ -55,4 +55,11 @@ export interface ChartData {
 export interface CommitAmount {
   address: string;
   amount: number;
+}
+
+// Registry for deduplicating voter addresses
+export interface VoterRegistry {
+  getId(address: string): number;
+  getAddress(id: number): string;
+  getAllAddresses(): string[];
 } 

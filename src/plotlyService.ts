@@ -15,8 +15,8 @@ export class PlotlyService {
     candidate: Candidate,
     votes: Vote[]
   ): void {
-    // Group votes by voter
-    const voterGroups = new Map<string, { yes: number; no: number; abstain: number; total: number }>();
+    // Group votes by voter ID
+    const voterGroups = new Map<number, { yes: number; no: number; abstain: number; total: number }>();
     
     votes.forEach(vote => {
       if (!voterGroups.has(vote.voter)) {
@@ -37,14 +37,14 @@ export class PlotlyService {
     const yesData: number[] = [];
     const noData: number[] = [];
     const abstainData: number[] = [];
-
-    sortedVoters.forEach(([voter, stakes]) => {
+    const registry = VotingService.prototype.getVoterRegistry();
+    sortedVoters.forEach(([voterId, stakes]) => {
       // Exclude voters with all zero votes
       if (stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0) return;
       // Only display voters with total stake >= 10,000 Algo (visual filter only)
       if (stakes.total < 10000) return;
       
-      voters.push(VotingService.truncateAddress(voter));
+      voters.push(VotingService.truncateAddress(registry.getAddress(voterId)));
       yesData.push(stakes.yes);
       noData.push(-stakes.no); // Negative for downward bars
       abstainData.push(stakes.abstain);
@@ -61,13 +61,13 @@ export class PlotlyService {
           line: { width: 0 }
         },
         hovertemplate: 
-          '<b>Voter:</b> %{text}<br>' +
+          '<b>Voter:</b> %{customdata}<br>' +
           '<b>Yes:</b> %{y:,.2f} ALGO<br>' +
           '<extra></extra>',
-        text: sortedVoters
+        customdata: sortedVoters
           .filter(([, stakes]) => !(stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0))
           .filter(([, stakes]) => stakes.total >= 10000)
-          .map(([voter]) => voter)
+          .map(([voterId]) => registry.getAddress(voterId))
       },
       {
         x: voters,
@@ -79,13 +79,13 @@ export class PlotlyService {
           line: { width: 0 }
         },
         hovertemplate: 
-          '<b>Voter:</b> %{text}<br>' +
+          '<b>Voter:</b> %{customdata}<br>' +
           '<b>No:</b> %{y:,.2f} ALGO<br>' +
           '<extra></extra>',
-        text: sortedVoters
+        customdata: sortedVoters
           .filter(([, stakes]) => !(stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0))
           .filter(([, stakes]) => stakes.total >= 10000)
-          .map(([voter]) => voter)
+          .map(([voterId]) => registry.getAddress(voterId))
       },
       {
         x: voters,
@@ -97,13 +97,13 @@ export class PlotlyService {
           line: { width: 0 }
         },
         hovertemplate: 
-          '<b>Voter:</b> %{text}<br>' +
+          '<b>Voter:</b> %{customdata}<br>' +
           '<b>Abstain:</b> %{y:,.2f} ALGO<br>' +
           '<extra></extra>',
-        text: sortedVoters
+        customdata: sortedVoters
           .filter(([, stakes]) => !(stakes.yes === 0 && stakes.no === 0 && stakes.abstain === 0))
           .filter(([, stakes]) => stakes.total >= 10000)
-          .map(([voter]) => voter)
+          .map(([voterId]) => registry.getAddress(voterId))
       }
     ];
 
@@ -156,7 +156,40 @@ export class PlotlyService {
       }
     };
 
-    Plotly.newPlot(container, data, layout, config);
+    Plotly.newPlot(container, data, layout, config).then(() => {
+      // Attach click handler directly to the Plotly plot div
+      (container as any).on('plotly_click', (eventData: any) => {
+        if (eventData.points && eventData.points.length > 0) {
+          const point = eventData.points[0];
+          const voterAddress = point.customdata;
+          if (voterAddress) {
+            navigator.clipboard.writeText(voterAddress).then(() => {
+              const feedback = document.createElement('div');
+              feedback.textContent = 'Address copied to clipboard!';
+              feedback.style.position = 'fixed';
+              feedback.style.top = '20px';
+              feedback.style.right = '20px';
+              feedback.style.background = '#008080';
+              feedback.style.color = 'white';
+              feedback.style.padding = '10px 15px';
+              feedback.style.borderRadius = '5px';
+              feedback.style.zIndex = '10000';
+              feedback.style.fontSize = '14px';
+              feedback.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+              document.body.appendChild(feedback);
+              setTimeout(() => {
+                if (feedback.parentNode) {
+                  feedback.parentNode.removeChild(feedback);
+                }
+              }, 2000);
+            }).catch((err) => {
+              console.error('Failed to copy address:', err);
+              alert(`Address copied: ${voterAddress}`);
+            });
+          }
+        }
+      });
+    });
   }
 
   static createSummaryChart(
@@ -268,15 +301,5 @@ export class PlotlyService {
     };
 
     Plotly.newPlot(container, data, layout, config);
-  }
-
-  static toggleLogScale(container: HTMLElement, useLogScale: boolean): void {
-    const update: any = {
-      yaxis: {
-        type: useLogScale ? 'log' : 'linear'
-      }
-    };
-    
-    Plotly.relayout(container, update);
   }
 } 

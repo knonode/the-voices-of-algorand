@@ -26,24 +26,23 @@ export class PopularityChartService {
     wrapper.style.alignItems = 'stretch';
     wrapper.style.height = '100%';
 
-    // Get all registered voters
+    // Get all registered voters (IDs)
     const voterWeights = votingService.getVoterWeights();
-    const allVoters = Array.from(voterWeights.keys());
-    const totalVoters = allVoters.length;
-
-    // Map address to vote type for this candidate
-    const voteMap = new Map<string, 'yes' | 'no' | 'abstain'>();
+    const registry = votingService.getVoterRegistry();
+    const allVoterIds = Array.from(voterWeights.keys()).map(addr => registry.getId(addr));
+    const totalVoters = allVoterIds.length;
+    // Map voter ID to vote type for this candidate
+    const voteMap = new Map<number, 'yes' | 'no' | 'abstain'>();
     votes.forEach(vote => {
       voteMap.set(vote.voter, vote.vote);
     });
-
     // Build pixel data
     const pixelData: {
-      address: string;
+      voterId: number;
       vote: 'yes' | 'no' | 'abstain' | 'none';
-    }[] = allVoters.map(address => ({
-      address,
-      vote: voteMap.get(address) || 'none',
+    }[] = allVoterIds.map(id => ({
+      voterId: id,
+      vote: voteMap.get(id) || 'none',
     }));
 
     // Count votes
@@ -98,7 +97,7 @@ export class PopularityChartService {
       x.push(col);
       y.push(row); // row index, top to bottom
       markerColors.push(PopularityChartService.COLORS[pixel.vote]);
-      text.push(`${pixel.address}<br>Vote: ${pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1)}`);
+      text.push(`${registry.getAddress(pixel.voterId)}<br>Vote: ${pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1)}`);
     });
 
     const data: any[] = [

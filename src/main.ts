@@ -132,19 +132,11 @@ class VotingVisualization {
   }
 
   private setupControls(): void {
-    const logScaleToggle = document.getElementById('log-scale-toggle') as HTMLInputElement;
-    if (logScaleToggle) {
-      logScaleToggle.addEventListener('change', (e) => {
-        const useLogScale = (e.target as HTMLInputElement).checked;
-        this.toggleLogScaleOnAllCharts(useLogScale);
-      });
-    }
-  }
-
-  private toggleLogScaleOnAllCharts(useLogScale: boolean): void {
-    this.charts.forEach((chartContainers) => {
-      PlotlyService.toggleLogScale(chartContainers.stakeChart, useLogScale);
-    });
+    // Remove all logic related to log scale toggle, including:
+    // - const logScaleToggle = ...
+    // - logScaleToggle.addEventListener(...)
+    // - this.toggleLogScaleOnAllCharts(...)
+    // - private toggleLogScaleOnAllCharts(...)
   }
 
   private updateLastUpdated(): void {
