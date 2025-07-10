@@ -160,10 +160,37 @@
         }
 
         .last-updated {
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             color: #20B2AA;
             font-size: 0.9rem;
             margin-top: 20px;
+            padding: 0 20px;
+        }
+
+        .last-updated a {
+            color: #48D1CC;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .last-updated a:hover {
+            color: #90EE90;
+            text-decoration: underline;
+        }
+
+        .powered-by, .built-by {
+            flex: 1;
+        }
+
+        .update-time {
+            flex: 1;
+            text-align: center;
+        }
+
+        .built-by {
+            text-align: right;
         }
 
         @media (max-width: 1200px) {
@@ -200,6 +227,15 @@
             .controls {
                 flex-direction: column;
                 align-items: center;
+            }
+            .last-updated {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .powered-by, .built-by, .update-time {
+                text-align: center;
             }
         }
     </style>
@@ -238,7 +274,15 @@
         </div>
 
         <div class="last-updated">
-            Last updated: <span id="last-updated">-</span>
+            <span class="powered-by">
+                Powered by <a href="https://nodely.io/" target="_blank" rel="noopener noreferrer">Nodely</a>
+            </span>
+            <span class="update-time">
+                Last updated: <span id="last-updated">-</span>
+            </span>
+            <span class="built-by">
+                Built with ❤️ by <a href="https://x.com/hampelman_nft" target="_blank" rel="noopener noreferrer">Hampelman</a>
+            </span>
         </div>
     </div>
 
