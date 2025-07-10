@@ -48,9 +48,9 @@ class VotingVisualization {
     const uniqueVotersEl = document.getElementById('unique-voters');
     const participationRateEl = document.getElementById('participation-rate');
 
-    if (totalVotesEl) totalVotesEl.textContent = stats.totalVotes.toString();
-    if (totalStakeEl) totalStakeEl.textContent = stats.totalStake.toFixed(2);
-    if (uniqueVotersEl) uniqueVotersEl.textContent = stats.uniqueVoters.toString();
+    if (totalVotesEl) totalVotesEl.textContent = stats.totalVotes.toLocaleString();
+    if (totalStakeEl) totalStakeEl.textContent = stats.totalStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (uniqueVotersEl) uniqueVotersEl.textContent = stats.uniqueVoters.toLocaleString();
     if (participationRateEl) participationRateEl.textContent = stats.participationRate.toFixed(1) + '%';
   }
 

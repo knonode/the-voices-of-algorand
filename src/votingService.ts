@@ -184,7 +184,19 @@ export class VotingService {
 
   getVotingStats(): VotingStats {
     const totalVotes = this.votes.length;
-    const totalStake = this.votes.reduce((sum, vote) => sum + vote.stake, 0);
+    
+    // Calculate total stake from unique voters only
+    const uniqueVoterStakes = new Set<string>();
+    let totalStake = 0;
+    
+    this.votes.forEach(vote => {
+      const voterAddress = VoterRegistry.getAddress(vote.voter);
+      if (!uniqueVoterStakes.has(voterAddress)) {
+        uniqueVoterStakes.add(voterAddress);
+        totalStake += vote.stake;
+      }
+    });
+    
     const uniqueVoters = new Set(this.votes.map(v => v.voter)).size;
     
     // Calculate participation rate based on registered voters
