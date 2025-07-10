@@ -24,12 +24,12 @@ export const CANDIDATES = [
     address: "emg110.algo"
   },
   {
-    name: "Taras Hirniak",
-    address: "67OLU3IO4YWOAYJK273DQJS6RU2ES45WPAYHWNIQJNYKRXGZ5NPBMMEK3I"
-  },
-  {
     name: "Paul Hinrichsen",
     address: "3HOQI46R2WNG2NIUYZRTXUAMCJBED7ZBPQ7J5WV7K4LM2POBSUCLJWMUZA"
+  }, 
+  {
+    name: "Taras Hirniak",
+    address: "67OLU3IO4YWOAYJK273DQJS6RU2ES45WPAYHWNIQJNYKRXGZ5NPBMMEK3I"
   },
   {
     name: "Dr. Uroš Hudomalj",
@@ -64,12 +64,12 @@ export const CANDIDATES = [
     address: "YKTO4C2WAC2BSMJMYKM43YCGUYHU3XHAHAYG6UUSF3BLOF6VMGRXKYB7ZU"
   },
   {
-    name: "Ľudovít Scholtz aka Everyday Algonaut",
-    address: "ALGONAUTSPIUHDCX3SLFXOFDUKOE4VY36XV4JX2JHQTWJNKVBKPEBQACRY"
-  },
-  {
     name: "Nicholas Shellabarger aka Shelly",
     address: "7UBGYVIHJKBIDSVZABRZSGAMN55HZSBX4MK3VBCHVM6F7OIWSGEN3Z75L4"
+  },
+  {
+    name: "Ľudovít Scholtz aka Everyday Algonaut",
+    address: "ALGONAUTSPIUHDCX3SLFXOFDUKOE4VY36XV4JX2JHQTWJNKVBKPEBQACRY"
   },
   {
     name: "Wilder Stubbs",
