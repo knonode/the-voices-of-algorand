@@ -12,7 +12,7 @@ export class EChartsService {
 
   static createStakeChart(
     container: HTMLElement,
-    candidate: Candidate,
+    _candidate: Candidate,
     votes: Vote[],
     votingService: VotingService
   ): echarts.ECharts {
