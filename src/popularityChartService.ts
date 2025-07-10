@@ -1,42 +1,28 @@
-import Plotly from 'plotly.js-dist-min';
+import * as echarts from 'echarts';
 import { Candidate, Vote } from './types';
 import { VotingService } from './votingService';
 
 export class PopularityChartService {
-  private static readonly COLORS = {
-    yes: '#90EE90',      // Soft green
-    no: '#FFB6C1',       // Soft red
-    abstain: '#F0E68C',  // Soft yellow
-    none: '#222',        // Gray for no vote
-  };
-
   static createPopularityChart(
     container: HTMLElement,
     _candidate: Candidate,
     votes: Vote[],
     votingService: VotingService
-  ): void {
-    // Clear container
+  ): echarts.ECharts {
+    // Clean slate: set container height and width
     container.innerHTML = '';
+    container.style.height = '400px';
+    container.style.width = '100%';
 
-    // Create wrapper
-    const wrapper = document.createElement('div');
-    wrapper.style.display = 'flex';
-    wrapper.style.flexDirection = 'column';
-    wrapper.style.alignItems = 'stretch';
-    wrapper.style.height = '100%';
-
-    // Get all registered voters (IDs)
+    // Prepare heatmap data
     const voterWeights = votingService.getVoterWeights();
     const registry = votingService.getVoterRegistry();
     const allVoterIds = Array.from(voterWeights.keys()).map(addr => registry.getId(addr));
     const totalVoters = allVoterIds.length;
-    // Map voter ID to vote type for this candidate
     const voteMap = new Map<number, 'yes' | 'no' | 'abstain'>();
     votes.forEach(vote => {
       voteMap.set(vote.voter, vote.vote);
     });
-    // Build pixel data
     const pixelData: {
       voterId: number;
       vote: 'yes' | 'no' | 'abstain' | 'none';
@@ -44,113 +30,193 @@ export class PopularityChartService {
       voterId: id,
       vote: voteMap.get(id) || 'none',
     }));
-
-    // Count votes
-    let yesCount = 0, abstainCount = 0, noCount = 0, noneCount = 0;
-    pixelData.forEach(pixel => {
-      if (pixel.vote === 'yes') yesCount++;
-      else if (pixel.vote === 'abstain') abstainCount++;
-      else if (pixel.vote === 'no') noCount++;
-      else noneCount++;
-    });
-
-    // Add counts display above the chart
-    const countsDiv = document.createElement('div');
-    countsDiv.className = 'popularity-counts';
-    countsDiv.style.display = 'flex';
-    countsDiv.style.justifyContent = 'center';
-    countsDiv.style.gap = '2.5rem';
-    countsDiv.style.marginBottom = '10px';
-    countsDiv.innerHTML = `
-      <span style="color: ${PopularityChartService.COLORS.yes}; font-weight: bold;">Yes: ${yesCount}</span>
-      <span style="color: ${PopularityChartService.COLORS.abstain}; font-weight: bold;">Abstain: ${abstainCount}</span>
-      <span style="color: ${PopularityChartService.COLORS.no}; font-weight: bold;">No: ${noCount}</span>
-      <span style="color: #888; font-weight: bold;">Not voted: ${noneCount}</span>
-    `;
-    wrapper.appendChild(countsDiv);
-
-    // Chart div
-    const chartDiv = document.createElement('div');
-    chartDiv.style.flex = '1 1 auto';
-    chartDiv.style.height = '100%';
-    wrapper.appendChild(chartDiv);
-    container.appendChild(wrapper);
-
-    // Sort: yes (left), abstain (middle), no (right), none (far right)
+    // Sort: yes, abstain, no, none
     pixelData.sort((a, b) => {
       const order = { yes: 0, abstain: 1, no: 2, none: 3 };
       return order[a.vote] - order[b.vote];
     });
-
-    // Grid layout (left-to-right, row by row)
-    const cols = Math.ceil(Math.sqrt(totalVoters));
+    console.log('Unique vote types:', Array.from(new Set(pixelData.map(p => p.vote))));
+    // Map vote types to numbers for visualMap
+    const voteTypeToNum = { yes: 0, abstain: 1, no: 2, none: 3 } as const;
+    // Grid layout (denser grid)
+    const cols = Math.ceil(Math.sqrt(totalVoters) * 1.2); // denser grid
     const rows = Math.ceil(totalVoters / cols);
-
-    const x: number[] = [];
-    const y: number[] = [];
-    const markerColors: string[] = [];
-    const text: string[] = [];
+    // Calculate symbol size to fill grid tightly
+    const containerWidth = container.offsetWidth || 400;
+    const containerHeight = parseInt(container.style.height) || 400;
+    const symbolSizeX = Math.floor(containerWidth / cols);
+    const symbolSizeY = Math.floor(containerHeight / rows);
+    const symbolSize = Math.max(4, Math.min(symbolSizeX, symbolSizeY) - 2); // -2 for minimal gap, min 4px
+    const data: [number, number, number, string, string, string][] = [];
+    pixelData.forEach((pixel, i) => {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const voterAddress = registry.getAddress(pixel.voterId);
+      const voteText = pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1);
+      data.push([col, row, voteTypeToNum[pixel.vote], voterAddress, voteText, pixel.vote]);
+    });
+    console.table(data.slice(0, 10));
+    console.log('Vote value counts:', data.reduce((acc: Record<number, number>, d) => { acc[d[2]] = (acc[d[2]] || 0) + 1; return acc; }, {} as Record<number, number>));
+    // Count votes for subtitle
+    const yesCount = pixelData.filter(p => p.vote === 'yes').length;
+    const abstainCount = pixelData.filter(p => p.vote === 'abstain').length;
+    const noCount = pixelData.filter(p => p.vote === 'no').length;
+    const noneCount = pixelData.filter(p => p.vote === 'none').length;
+    // Create separate series for each vote type to ensure colors work
+    const yesData: [number, number, string, string][] = [];
+    const abstainData: [number, number, string, string][] = [];
+    const noData: [number, number, string, string][] = [];
+    const noneData: [number, number, string, string][] = [];
 
     pixelData.forEach((pixel, i) => {
       const row = Math.floor(i / cols);
       const col = i % cols;
-      x.push(col);
-      y.push(row); // row index, top to bottom
-      markerColors.push(PopularityChartService.COLORS[pixel.vote]);
-      text.push(`${registry.getAddress(pixel.voterId)}<br>Vote: ${pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1)}`);
+      const voterAddress = registry.getAddress(pixel.voterId);
+      const voteText = pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1);
+      
+      const pointData: [number, number, string, string] = [col, row, voterAddress, voteText];
+      
+      switch (pixel.vote) {
+        case 'yes':
+          yesData.push(pointData);
+          break;
+        case 'abstain':
+          abstainData.push(pointData);
+          break;
+        case 'no':
+          noData.push(pointData);
+          break;
+        case 'none':
+          noneData.push(pointData);
+          break;
+      }
     });
 
-    const data: any[] = [
-      {
-        x,
-        y,
-        type: 'scatter',
-        mode: 'markers',
-        marker: {
-          color: markerColors,
-          size: 8,
-          line: { width: 0 }
-        },
-        text,
-        hovertemplate: '<b>Voter:</b> %{text}<extra></extra>',
-        showlegend: false
-      }
-    ];
+    // Slightly increase symbol size to overlap squares and remove visible gaps
+    const overlap = 1;
+    const tightSymbolSize = symbolSize + overlap;
 
-    const layout: any = {
+    const option: echarts.EChartsOption = {
       title: {
-        text: 'Popularity Votes',
-        font: { color: '#008080', size: 14 }
+        text: 'Popular vote',
+        subtext: `Yes: ${yesCount}   Abstain: ${abstainCount}   No: ${noCount}   None: ${noneCount}`,
+        left: 'center',
+        top: 10,
+        textStyle: {
+          color: '#20B2AA',
+          fontSize: 18,
+          fontWeight: 'bold'
+        },
+        subtextStyle: {
+          color: '#aaa',
+          fontSize: 14
+        }
       },
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      font: { color: '#20B2AA' },
-      xaxis: {
-        range: [-0.5, cols - 0.5],
-        showticklabels: false,
-        showgrid: false,
-        zeroline: false,
-        fixedrange: true
+      backgroundColor: 'rgb(10, 11, 22)',
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        formatter: function(params: any) {
+          const voterAddress = params.data[2];
+          const voteText = params.data[3];
+          const truncatedAddress = voterAddress.length > 8 ? 
+            voterAddress.substring(0, 4) + '...' + voterAddress.substring(voterAddress.length - 4) : 
+            voterAddress;
+          return `<b>Voter:</b> ${truncatedAddress}<br/><b>Vote:</b> ${voteText}`;
+        }
       },
-      yaxis: {
-        range: [-0.5, rows - 0.5],
-        showticklabels: false,
-        showgrid: false,
-        zeroline: false,
-        fixedrange: true
+      grid: {
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: 30,
+        containLabel: true
       },
-      showlegend: false,
-      margin: { l: 20, r: 20, t: 60, b: 40 },
-      hovermode: 'closest',
-      autosize: true
+      xAxis: {
+        type: 'value',
+        min: 0,
+        max: cols - 1,
+        show: false
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: rows - 1,
+        show: false
+      },
+      series: [
+        {
+          name: 'Yes',
+          type: 'scatter',
+          data: yesData,
+          symbolSize: tightSymbolSize,
+          symbol: 'rect',
+          itemStyle: {
+            color: '#90EE90',
+            opacity: 1
+          },
+          emphasis: {
+            itemStyle: {
+              borderColor: '#48D1CC',
+              borderWidth: 2
+            }
+          }
+        },
+        {
+          name: 'Abstain',
+          type: 'scatter',
+          data: abstainData,
+          symbolSize: tightSymbolSize,
+          symbol: 'rect',
+          itemStyle: {
+            color: '#F0E68C',
+            opacity: 1
+          },
+          emphasis: {
+            itemStyle: {
+              borderColor: '#48D1CC',
+              borderWidth: 2
+            }
+          }
+        },
+        {
+          name: 'No',
+          type: 'scatter',
+          data: noData,
+          symbolSize: tightSymbolSize,
+          symbol: 'rect',
+          itemStyle: {
+            color: '#FFB6C1',
+            opacity: 1
+          },
+          emphasis: {
+            itemStyle: {
+              borderColor: '#48D1CC',
+              borderWidth: 2
+            }
+          }
+        },
+        {
+          name: 'None',
+          type: 'scatter',
+          data: noneData,
+          symbolSize: tightSymbolSize,
+          symbol: 'rect',
+          itemStyle: {
+            color: 'transparent',
+            opacity: 0
+          },
+          emphasis: {
+            itemStyle: {
+              borderColor: '#48D1CC',
+              borderWidth: 2
+            }
+          }
+        }
+      ]
     };
-
-    const config: any = {
-      responsive: true,
-      displayModeBar: false, // Hide mode bar for popularity chart
-      staticPlot: false
-    };
-
-    Plotly.newPlot(chartDiv, data, layout, config);
+    const chart = echarts.init(container);
+    chart.setOption(option);
+    return chart;
   }
 } 

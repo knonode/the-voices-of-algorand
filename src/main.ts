@@ -1,11 +1,11 @@
 import { VotingService } from './votingService';
-import { PlotlyService } from './plotlyService';
+import { EChartsService } from './echartsService';
 import { PopularityChartService } from './popularityChartService';
-import Plotly from 'plotly.js-dist-min';
+import * as echarts from 'echarts';
 
 class VotingVisualization {
   private votingService: VotingService;
-  private charts: Map<string, { stakeChart: HTMLElement; popularityChart: HTMLElement }> = new Map();
+  private charts: Map<string, { stakeChart: echarts.ECharts; popularityChart: echarts.ECharts }> = new Map();
   private updateInterval: number | null = null;
 
   constructor() {
@@ -58,11 +58,17 @@ class VotingVisualization {
     const container = document.getElementById('charts-container');
     if (!container) return;
 
+    console.log('Creating charts...');
+
+    // Dispose existing charts to free memory
+    this.disposeCharts();
+
     // Clear existing charts
     container.innerHTML = '';
     this.charts.clear();
 
     let candidates = this.votingService.getCandidates();
+    console.log(`Found ${candidates.length} candidates`);
 
     // Sort by number of unique voters (descending)
     candidates = candidates.slice().sort((a, b) => {
@@ -72,6 +78,8 @@ class VotingVisualization {
     });
 
     candidates.forEach(candidate => {
+      console.log(`Processing candidate: ${candidate.name} with ${candidate.votes.length} votes`);
+      
       const chartWrapper = document.createElement('div');
       chartWrapper.className = 'chart-wrapper';
       
@@ -96,6 +104,7 @@ class VotingVisualization {
         noVotesMsg.style.marginTop = '120px';
         noVotesMsg.textContent = 'No votes yet';
         chartWrapper.appendChild(noVotesMsg);
+        container.appendChild(chartWrapper);
       } else {
         // Create charts grid
         const chartsGrid = document.createElement('div');
@@ -114,20 +123,41 @@ class VotingVisualization {
         chartsGrid.appendChild(stakeChartContainer);
         chartsGrid.appendChild(popularityChartContainer);
         chartWrapper.appendChild(chartsGrid);
+        container.appendChild(chartWrapper);
         
-        // Store chart containers for later reference
-        this.charts.set(candidate.name, {
-          stakeChart: stakeChartContainer,
-          popularityChart: popularityChartContainer
+        // Defer ECharts creation to next frame so containers have size
+        requestAnimationFrame(() => {
+          const votes = this.votingService.getCandidateVotes(candidate.name);
+          console.log(`Creating charts for ${candidate.name} with ${votes.length} votes`);
+          const stakeChart = EChartsService.createStakeChart(stakeChartContainer, candidate, votes, this.votingService);
+          const popularityChart = PopularityChartService.createPopularityChart(popularityChartContainer, candidate, votes, this.votingService);
+          this.charts.set(candidate.name, {
+            stakeChart: stakeChart,
+            popularityChart: popularityChart
+          });
         });
-        
-        // Create charts
-        const votes = this.votingService.getCandidateVotes(candidate.name);
-        PlotlyService.createStakeChart(stakeChartContainer, candidate, votes);
-        PopularityChartService.createPopularityChart(popularityChartContainer, candidate, votes, this.votingService);
       }
-      
-      container.appendChild(chartWrapper);
+    });
+
+    console.log('Charts creation completed');
+
+    // Handle window resize for responsive charts
+    window.addEventListener('resize', this.handleResize.bind(this));
+  }
+
+  private handleResize(): void {
+    // Resize all charts when window size changes
+    this.charts.forEach((chartContainers) => {
+      chartContainers.stakeChart.resize();
+      chartContainers.popularityChart.resize();
+    });
+  }
+
+  private disposeCharts(): void {
+    // Dispose all existing charts to free memory
+    this.charts.forEach((chartContainers) => {
+      chartContainers.stakeChart.dispose();
+      chartContainers.popularityChart.dispose();
     });
   }
 
@@ -175,12 +205,12 @@ class VotingVisualization {
       clearInterval(this.updateInterval);
     }
     
-    // Clean up Plotly charts
-    this.charts.forEach((chartContainers) => {
-      Plotly.purge(chartContainers.stakeChart);
-      Plotly.purge(chartContainers.popularityChart);
-    });
+    // Clean up ECharts instances
+    this.disposeCharts();
     this.charts.clear();
+    
+    // Remove resize listener
+    window.removeEventListener('resize', this.handleResize.bind(this));
   }
 }
 

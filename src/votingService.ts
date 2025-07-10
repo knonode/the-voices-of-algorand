@@ -111,7 +111,9 @@ export class VotingService {
 
   async fetchAndProcessVotes(): Promise<void> {
     try {
+      console.log('Starting fetchAndProcessVotes...');
       await this.loadCommitAmounts();
+      console.log('Commit amounts loaded successfully');
       console.log('Fetching voting transactions...');
       const transactions = await fetchVotingAccountTransactions();
       console.log(`Found ${transactions.length} transactions`);
@@ -120,6 +122,7 @@ export class VotingService {
 
       // Use only the latest vote per voter per candidate
       const latestVotesTxs = getLatestVotes(transactions);
+      console.log(`Found ${latestVotesTxs.length} latest voting transactions`);
       const parsedVotes: Vote[] = [];
       for (const tx of latestVotesTxs) {
         const votes = this.parseTransaction(tx);
@@ -132,10 +135,12 @@ export class VotingService {
         ...vote,
         stake: this.voterWeights.get(VoterRegistry.getAddress(vote.voter)) || 0
       }));
+      console.log(`Assigned stakes to ${this.votes.length} votes`);
 
       // Update candidate data
       this.updateCandidateData();
       console.log('Voting data processed successfully');
+      console.log('Candidates with votes:', this.getCandidates().filter(c => c.votes.length > 0).map(c => ({ name: c.name, voteCount: c.votes.length })));
     } catch (error) {
       console.error('Error fetching and processing votes:', error);
       throw error;

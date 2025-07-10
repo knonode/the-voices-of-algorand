@@ -5,49 +5,66 @@ Create a real-time visualization of on-chain voting for the xGov council electio
 
 ## Current Status ✅
 - [x] TypeScript project with Vite build system
-- [x] Chart.js implementation with stacked bar charts
+- [x] Plotly.js implementation with stacked bar charts
 - [x] Data fetching from Algorand blockchain
 - [x] Real-time updates and responsive design
 - [x] Dark theme with teal color scheme
 - [x] Stake-weighted voting visualization
 - [x] Candidate sorting by unique voters
 - [x] Address display under candidate names
+- [x] Popularity vote charts with pixel visualization
 
-## Migration to Plotly.js + New Popularity Chart 🚀
+## Migration to ECharts for Memory Optimization 🚀
+
+### Background
+The current Plotly.js implementation is consuming excessive memory due to chart complexity. ECharts provides better memory management and performance for large datasets while maintaining rich interactive features.
 
 ### Phase 1: Dependencies & Setup
-- [ ] Install Plotly.js and remove Chart.js
+- [ ] Install ECharts and remove Plotly.js
 - [ ] Update package.json dependencies
-- [ ] Test Plotly.js integration
+- [ ] Add ECharts type definitions
+- [ ] Test ECharts integration
+- [ ] Remove Plotly.js type definitions
 
 ### Phase 2: Core Chart Migration
-- [ ] Migrate stake-weighted bar charts from Chart.js to Plotly.js
+- [ ] Create new EChartsService to replace PlotlyService
+- [ ] Migrate stake-weighted bar charts from Plotly.js to ECharts
 - [ ] Implement log scale support for better data visualization
-- [ ] Enhance tooltips with Plotly.js interactive features
+- [ ] Enhance tooltips with ECharts interactive features
 - [ ] Maintain current color scheme and styling
 - [ ] Preserve all existing functionality (filtering, sorting, etc.)
+- [ ] Implement click handlers for address copying
+- [ ] Add chart export capabilities (PNG, SVG)
 
-### Phase 3: New Popularity Vote Chart
-- [ ] Design pixel canvas layout for popularity votes
-- [ ] Implement vote grouping: Yes (left), Abstain (middle), No (right)
-- [ ] Create individual pixels for each vote (no stake weighting)
+### Phase 3: Popularity Chart Migration
+- [ ] Migrate popularity vote charts from Plotly.js to ECharts
+- [ ] Implement pixel canvas layout using ECharts scatter plot
+- [ ] Maintain vote grouping: Yes (left), Abstain (middle), No (right)
+- [ ] Preserve individual pixels for each vote (no stake weighting)
 - [ ] Use same color scheme: green (yes), yellow (abstain), red (no)
 - [ ] Add interactive tooltips showing voter information
 - [ ] Ensure responsive design for different screen sizes
+- [ ] Maintain vote count display above charts
 
-### Phase 4: Layout & UI Updates
-- [ ] Update HTML structure to accommodate dual charts per candidate
-- [ ] Modify CSS for new chart layout (stake chart + popularity chart)
-- [ ] Implement chart switching or side-by-side display
-- [ ] Update main.ts to handle both chart types
+### Phase 4: Summary Chart Migration
+- [ ] Migrate summary chart from Plotly.js to ECharts
+- [ ] Implement stacked bar chart for candidate comparison
+- [ ] Maintain legend and hover functionality
+- [ ] Preserve export capabilities
+
+### Phase 5: Layout & UI Updates
+- [ ] Update main.ts to use ECharts instead of Plotly
+- [ ] Modify chart container management
+- [ ] Update chart cleanup and memory management
 - [ ] Ensure proper chart sizing and responsiveness
+- [ ] Test chart performance with large datasets
 
-### Phase 5: Enhanced Features
-- [ ] Add log scale toggle for stake charts
-- [ ] Implement zoom and pan functionality
-- [ ] Add chart export capabilities (PNG, SVG)
-- [ ] Enhance tooltips with more detailed information
-- [ ] Add chart legends and better labeling
+### Phase 6: Memory Optimization
+- [ ] Implement chart disposal on candidate changes
+- [ ] Optimize data processing for ECharts format
+- [ ] Add memory usage monitoring
+- [ ] Implement lazy loading for charts
+- [ ] Test memory usage improvements
 
 ## NEW: Use commit-amount.csv for Staking Amounts
 
@@ -70,9 +87,9 @@ Previously, stake amounts were parsed from on-chain commit messages, but these r
 - No votes: Soft red (#FFB6C1)
 - Abstain: Soft yellow (#F0E68C)
 
-### New Chart Types
+### Chart Types (ECharts Migration)
 
-#### 1. Stake-Weighted Chart (Plotly.js Migration)
+#### 1. Stake-Weighted Chart (ECharts Migration)
 - **Type**: Stacked bar chart with log scale support
 - **Data**: Stake-weighted votes per voter
 - **Features**: 
@@ -80,9 +97,10 @@ Previously, stake amounts were parsed from on-chain commit messages, but these r
   - Enhanced tooltips
   - Zoom/pan functionality
   - Export capabilities
+  - Click to copy address
 
-#### 2. Popularity Vote Chart (New)
-- **Type**: Pixel canvas/scatter plot
+#### 2. Popularity Vote Chart (ECharts Migration)
+- **Type**: Scatter plot with custom markers
 - **Data**: Individual votes (no stake weighting)
 - **Layout**: 
   - Yes votes: Left side (green pixels)
@@ -93,6 +111,16 @@ Previously, stake amounts were parsed from on-chain commit messages, but these r
   - Interactive tooltips showing voter address
   - Responsive pixel sizing
   - Clear visual grouping
+  - Vote count display
+
+#### 3. Summary Chart (ECharts Migration)
+- **Type**: Stacked bar chart
+- **Data**: Total votes per candidate
+- **Features**:
+  - Stacked yes/no/abstain bars
+  - Interactive legend
+  - Export capabilities
+  - Responsive design
 
 ### Data Structure (Enhanced)
 ```typescript
@@ -114,39 +142,43 @@ interface Candidate {
   abstainVotes: number;
 }
 
-interface ChartData {
-  stakeChart: Plotly.Data[];
-  popularityChart: Plotly.Data[];
+interface EChartsData {
+  stakeChart: echarts.EChartsOption;
+  popularityChart: echarts.EChartsOption;
+  summaryChart: echarts.EChartsOption;
 }
 ```
 
 ### Implementation Order
-1. **Setup**: Install Plotly.js, remove Chart.js
-2. **Migration**: Convert existing bar charts to Plotly.js
-3. **Popularity Chart**: Implement pixel canvas for individual votes
-4. **Layout**: Update HTML/CSS for dual chart display
-5. **Enhancement**: Add log scale, zoom, export features
-6. **Testing**: Ensure all functionality works correctly
+1. **Setup**: Install ECharts, remove Plotly.js
+2. **Core Migration**: Convert stake charts to ECharts
+3. **Popularity Migration**: Convert popularity charts to ECharts
+4. **Summary Migration**: Convert summary chart to ECharts
+5. **Integration**: Update main.ts and chart management
+6. **Optimization**: Implement memory management
+7. **Testing**: Ensure all functionality works correctly
 
 ### File Structure Changes
 ```
 src/
-├── main.ts (updated for dual charts)
-├── plotlyService.ts (new - replaces chartService.ts)
-├── popularityChartService.ts (new)
+├── main.ts (updated for ECharts)
+├── echartsService.ts (new - replaces plotlyService.ts)
+├── popularityChartService.ts (updated for ECharts)
 ├── votingService.ts (unchanged)
 ├── api.ts (unchanged)
 ├── candidates.ts (unchanged)
-└── types.ts (enhanced)
+└── types.ts (enhanced for ECharts)
 ```
 
-### Benefits of Migration
+### Benefits of ECharts Migration
+- **Memory Efficiency**: Better memory management for large datasets
+- **Performance**: Optimized rendering and interaction
 - **Log Scale**: Better visualization of large stake differences
 - **Interactive Tooltips**: More detailed information on hover
 - **Export Features**: Save charts as images
 - **Zoom/Pan**: Better exploration of data
 - **Popularity View**: See voting patterns without stake influence
-- **Better Performance**: Plotly.js optimized for large datasets
+- **Responsive Design**: Better mobile and desktop experience
 
 ## API Endpoints (Unchanged)
 - Nodely Algorand API: https://nodely.io/swagger/index.html?url=/swagger/api/4160/algod.oas3.yml
