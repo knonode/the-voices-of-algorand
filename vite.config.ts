@@ -12,7 +12,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        statistics: resolve(__dirname, 'public/statistics.html')
+        statistics: resolve(__dirname, 'statistics.html') // use root-level statistics.html for output to dist/
       }
     }
   },
