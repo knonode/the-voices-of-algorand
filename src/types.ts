@@ -39,6 +39,8 @@ export interface AlgorandAccount {
   address: string;
   amount: number;
   'amount-without-pending-rewards': number;
+  'created-at-round'?: number;
+  createdAtRound?: number;
 }
 
 export interface ChartData {

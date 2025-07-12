@@ -109,28 +109,74 @@ class VotingVisualization {
         // Create charts grid
         const chartsGrid = document.createElement('div');
         chartsGrid.className = 'charts-grid';
-        
+        chartsGrid.style.alignItems = 'flex-start'; // top-align both columns
+
         // Create stake chart container
         const stakeChartContainer = document.createElement('div');
         stakeChartContainer.className = 'stake-chart';
         stakeChartContainer.id = `stake-chart-${candidate.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        
+
+        // Create popularity chart wrapper (for title and chart)
+        const popularityWrapper = document.createElement('div');
+        popularityWrapper.className = 'popularity-wrapper';
+        popularityWrapper.style.display = 'flex';
+        popularityWrapper.style.flexDirection = 'column';
+        popularityWrapper.style.alignItems = 'center';
+        popularityWrapper.style.width = '100%';
+
+        // Create popularity chart title and vote counts
+        const popTitle = document.createElement('div');
+        popTitle.className = 'popularity-title';
+        popTitle.style.color = '#20B2AA';
+        popTitle.style.fontWeight = 'bold';
+        popTitle.style.fontSize = '1.2rem';
+        popTitle.style.marginBottom = '4px';
+        popTitle.textContent = 'Popular vote';
+
+        const popCounts = document.createElement('div');
+        popCounts.className = 'popularity-counts';
+        popCounts.style.color = '#aaa';
+        popCounts.style.fontSize = '1rem';
+        popCounts.style.marginBottom = '8px';
+        // We'll fill this in after chart creation
+
         // Create popularity chart container
         const popularityChartContainer = document.createElement('div');
         popularityChartContainer.className = 'popularity-chart';
         popularityChartContainer.id = `popularity-chart-${candidate.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        
+
+        popularityWrapper.appendChild(popTitle);
+        popularityWrapper.appendChild(popCounts);
+        popularityWrapper.appendChild(popularityChartContainer);
+
         chartsGrid.appendChild(stakeChartContainer);
-        chartsGrid.appendChild(popularityChartContainer);
+        chartsGrid.appendChild(popularityWrapper);
         chartWrapper.appendChild(chartsGrid);
         container.appendChild(chartWrapper);
-        
+
         // Defer ECharts creation to next frame so containers have size
         requestAnimationFrame(() => {
           const votes = this.votingService.getCandidateVotes(candidate.name);
-          console.log(`Creating charts for ${candidate.name} with ${votes.length} votes`);
           const stakeChart = EChartsService.createStakeChart(stakeChartContainer, candidate, votes, this.votingService);
-          const popularityChart = PopularityChartService.createPopularityChart(popularityChartContainer, candidate, votes, this.votingService);
+          // Create popularity chart with no title/subtext
+          const popularityChart = PopularityChartService.createPopularityChart(
+            popularityChartContainer,
+            candidate,
+            votes,
+            this.votingService,
+            { noTitle: true }
+          );
+          // Fill in vote counts
+          const voterWeights = this.votingService.getVoterWeights();
+          const registry = this.votingService.getVoterRegistry();
+          const allVoterIds = Array.from(voterWeights.keys()).map(addr => registry.getId(addr));
+          const voteMap = new Map();
+          votes.forEach(vote => { voteMap.set(vote.voter, vote.vote); });
+          const yesCount = allVoterIds.filter(id => voteMap.get(id) === 'yes').length;
+          const abstainCount = allVoterIds.filter(id => voteMap.get(id) === 'abstain').length;
+          const noCount = allVoterIds.filter(id => voteMap.get(id) === 'no').length;
+          const noneCount = allVoterIds.filter(id => !voteMap.has(id)).length;
+          popCounts.textContent = `Yes: ${yesCount}   Abstain: ${abstainCount}   No: ${noCount}   None: ${noneCount}`;
           this.charts.set(candidate.name, {
             stakeChart: stakeChart,
             popularityChart: popularityChart

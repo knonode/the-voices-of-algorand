@@ -7,7 +7,8 @@ export class PopularityChartService {
     container: HTMLElement,
     _candidate: Candidate,
     votes: Vote[],
-    votingService: VotingService
+    votingService: VotingService,
+    options?: { noTitle?: boolean }
   ): echarts.ECharts {
     // Clean slate: set container height and width
     container.innerHTML = '';
@@ -97,21 +98,6 @@ export class PopularityChartService {
     const tightSymbolSize = symbolSize + overlap;
 
     const option: echarts.EChartsOption = {
-      title: {
-        text: 'Popular vote',
-        subtext: `Yes: ${yesCount}   Abstain: ${abstainCount}   No: ${noCount}   None: ${noneCount}`,
-        left: 'center',
-        top: 10,
-        textStyle: {
-          color: '#20B2AA',
-          fontSize: 18,
-          fontWeight: 'bold'
-        },
-        subtextStyle: {
-          color: '#aaa',
-          fontSize: 14
-        }
-      },
       backgroundColor: 'rgb(10, 11, 22)',
       tooltip: {
         trigger: 'item',
@@ -215,6 +201,23 @@ export class PopularityChartService {
         }
       ]
     };
+    if (!options || !options.noTitle) {
+      option.title = {
+        text: 'Popular vote',
+        subtext: `Yes: ${yesCount}   Abstain: ${abstainCount}   No: ${noCount}   None: ${noneCount}`,
+        left: 'center',
+        top: 10,
+        textStyle: {
+          color: '#20B2AA',
+          fontSize: 18,
+          fontWeight: 'bold'
+        },
+        subtextStyle: {
+          color: '#aaa',
+          fontSize: 14
+        }
+      };
+    }
     const chart = echarts.init(container);
     chart.setOption(option);
     return chart;
