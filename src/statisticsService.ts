@@ -22,7 +22,6 @@ export class StatisticsService {
 
   getStatistics(votingService: VotingService): StatisticsData {
     const voterWeights = votingService.getVoterWeights();
-    const registry = votingService.getVoterRegistry();
     const votes = votingService.getVotes();
     
     const totalRegistered = voterWeights.size;
@@ -70,9 +69,6 @@ export class StatisticsService {
 
   createNonVotersChart(container: HTMLElement, votingService: VotingService): echarts.ECharts {
     const nonVoters = this.getNonVoters(votingService);
-    
-    // Calculate total non-vote stake
-    const totalNonVoteStake = nonVoters.reduce((sum, nonVoter) => sum + nonVoter.stake, 0);
     
     // Prepare chart data
     const addresses: string[] = [];
