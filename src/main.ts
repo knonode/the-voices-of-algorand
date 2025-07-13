@@ -4,6 +4,7 @@ import { PopularityChartService } from './popularityChartService';
 import { StatisticsService } from './statisticsService';
 import { Candidate, Vote } from './types';
 import * as echarts from 'echarts';
+import confetti from 'canvas-confetti';
 
 const GOVERNANCE_API_PERIODS_URL = 'https://governance.algorand.foundation/api/periods/active';
 
@@ -18,6 +19,9 @@ class VotingVisualization {
   private racingBarData: { timestamps: number[]; candidates: string[]; series: Record<string, number[]> } | null = null;
   private racingBarTimer: number | null = null;
   private votingPeriod: { start: number; end: number } | null = null;
+  private countdownInterval: number | null = null;
+  private confettiTimeout: number | null = null;
+  private winnerOverlay: HTMLElement | null = null;
 
   constructor() {
     this.votingService = new VotingService();
@@ -44,12 +48,11 @@ class VotingVisualization {
       this.updateLastUpdated();
       this.createNonVotersChart();
       this.setupBreakdownDropdown();
-      // --- Fix: Initialize racing bar chart after data is loaded ---
       await this.fetchVotingPeriod();
       this.prepareRacingBarData();
       this.initRacingBarChart();
       this.setupRacingBarPlayButton();
-      // --- End fix ---
+      this.startCountdownTimer();
       this.showLoading(false);
     } catch (error) {
       this.showError('Failed to load voting data: ' + error);
@@ -59,19 +62,151 @@ class VotingVisualization {
 
   private updateStats(): void {
     const stats = this.votingService.getVotingStats();
-    
-    const totalVotesEl = document.getElementById('total-votes');
     const totalStakeEl = document.getElementById('total-stake');
     const uniqueVotersEl = document.getElementById('unique-voters');
     const participationRateEl = document.getElementById('participation-rate');
-
-    if (totalVotesEl) totalVotesEl.textContent = stats.totalVotes.toLocaleString();
     if (totalStakeEl) totalStakeEl.textContent = stats.totalStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    if (uniqueVotersEl) uniqueVotersEl.textContent = stats.uniqueVoters.toLocaleString();
+    if (uniqueVotersEl) uniqueVotersEl.textContent = `${stats.uniqueVoters.toLocaleString()}`;
     if (participationRateEl) participationRateEl.textContent = stats.participationRate.toFixed(1) + '%';
   }
 
+  private startCountdownTimer(): void {
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
+    const countdownEl = document.getElementById('total-votes');
+    if (!countdownEl || !this.votingPeriod) return;
+    const update = () => {
+      const now = Date.now();
+      const end = this.votingPeriod!.end;
+      let diff = end - now;
+      if (diff < 0) diff = 0;
+      if (diff <= 60 * 1000) {
+        // Last minute: show seconds
+        const seconds = Math.floor(diff / 1000);
+        countdownEl.textContent = `${seconds}s`;
+        if (diff === 0) {
+          this.triggerCelebration();
+        }
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        countdownEl.textContent = `${hours}h ${minutes}m`;
+      }
+    };
+    update();
+    this.countdownInterval = window.setInterval(update, 1000);
+  }
 
+  private raiseConfettiZIndex(): void {
+    // Find all confetti canvases and raise their z-index above the overlay
+    document.querySelectorAll('canvas').forEach((canvas: any) => {
+      if (canvas.style) {
+        canvas.style.zIndex = '2147483647'; // One above overlay
+        canvas.style.pointerEvents = 'none'; // Don't block clicks
+      }
+    });
+  }
+
+  private triggerCelebration(): void {
+    if (this.confettiTimeout) return; // Prevent multiple triggers
+    // Fire a lot of confetti: explode from different locations across the window
+    const burst = (originX: number, originY: number) => {
+      confetti({
+        particleCount: 100,
+        spread: 80,
+        startVelocity: 45, // more natural
+        gravity: 1.1, // falls faster
+        scalar: 1.2,
+        origin: { x: originX, y: originY },
+        ticks: 100,
+      });
+      this.raiseConfettiZIndex();
+    };
+    // Explode from random locations across the window
+    for (let i = 0; i < 30; i++) {
+      setTimeout(() => {
+        for (let j = 0; j < 4; j++) {
+          const x = Math.random() * 0.8 + 0.1; // avoid extreme edges
+          const y = Math.random() * 0.7 + 0.1; // avoid extreme top/bottom
+          burst(x, y);
+        }
+      }, i * 200);
+    }
+    // Show winner overlay after confetti
+    this.confettiTimeout = window.setTimeout(() => {
+      this.showWinnerOverlay();
+    }, 4500);
+  }
+
+  private showWinnerOverlay(): void {
+    if (this.winnerOverlay) return;
+    // Get top 11 candidates from the final scoreboard
+    let winners: string[] = [];
+    if (this.racingBarData && this.racingBarData.candidates && this.racingBarData.series) {
+      const latestIdx = this.racingBarData.timestamps.length - 1;
+      const frameData = this.racingBarData.candidates.map((c: string, i: number) => ({
+        name: c,
+        value: this.racingBarData!.series[c][latestIdx],
+      }));
+      frameData.sort((a, b) => b.value - a.value);
+      winners = frameData.slice(0, 11).map(d => d.name);
+    }
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(10, 11, 22, 0.98)';
+    overlay.style.zIndex = '2147483647'; // Max z-index for most browsers
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.gap = '2rem';
+    overlay.style.pointerEvents = 'auto';
+    // Title
+    const title = document.createElement('div');
+    title.textContent = '🏆 Council Winners! 🏆';
+    title.style.fontSize = '3rem';
+    title.style.color = '#FFD700';
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '2rem';
+    overlay.appendChild(title);
+    // Winner names
+    winners.forEach((name, idx) => {
+      const winnerDiv = document.createElement('div');
+      winnerDiv.textContent = name;
+      winnerDiv.style.fontSize = '2.5rem';
+      winnerDiv.style.color = '#FFD700';
+      winnerDiv.style.fontWeight = 'bold';
+      winnerDiv.style.opacity = '0';
+      winnerDiv.style.transition = 'opacity 0.7s';
+      winnerDiv.style.margin = '0.5rem 0';
+      overlay.appendChild(winnerDiv);
+      setTimeout(() => {
+        winnerDiv.style.opacity = '1';
+      }, 500 + idx * 400);
+    });
+    // Dismiss button
+    const btn = document.createElement('button');
+    btn.textContent = 'Close';
+    btn.style.marginTop = '3rem';
+    btn.style.fontSize = '1.5rem';
+    btn.style.padding = '1rem 2.5rem';
+    btn.style.background = '#20B2AA';
+    btn.style.color = '#0A0B16';
+    btn.style.border = 'none';
+    btn.style.borderRadius = '8px';
+    btn.style.cursor = 'pointer';
+    btn.onclick = () => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      this.winnerOverlay = null;
+    };
+    overlay.appendChild(btn);
+    document.body.appendChild(overlay);
+    this.winnerOverlay = overlay;
+  }
 
   private setupCandidateDropdown(): void {
     const dropdown = document.getElementById('candidate-dropdown') as HTMLSelectElement;
@@ -691,7 +826,7 @@ class VotingVisualization {
         markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
           symbol: ['none', 'none'],
           lineStyle: {
-            color: '#FF6B6B',
+            color: '#096b4f',
             width: 3,
             type: 'solid'
           },
@@ -772,7 +907,7 @@ class VotingVisualization {
             markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
               symbol: ['none', 'none'],
               lineStyle: {
-                color: '#FF6B6B',
+                color: '#096b4f',
                 width: 3,
                 type: 'solid'
               },
@@ -794,6 +929,12 @@ class VotingVisualization {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
     }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+    if (this.confettiTimeout) {
+      clearTimeout(this.confettiTimeout);
+    }
     
     this.disposeCurrentCharts();
     
@@ -804,7 +945,8 @@ class VotingVisualization {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new VotingVisualization();
+  const app = new VotingVisualization();
+  (window as any).__xgovApp = app; // Expose for debugging/testing
 });
 
 // Cleanup on page unload

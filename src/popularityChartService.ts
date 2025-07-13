@@ -95,7 +95,7 @@ export class PopularityChartService {
     const tightSymbolSize = symbolSize + overlap;
 
     const option: echarts.EChartsOption = {
-      backgroundColor: 'rgb(10, 11, 22)',
+
       tooltip: {
         trigger: 'item',
         confine: true,

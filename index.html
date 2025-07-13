@@ -174,7 +174,7 @@
             max-height: 100%;
             position: relative;
             overflow: hidden;
-            background: #181818;
+            background: transparent;
             border-radius: 10px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.12);
             margin: 0 auto;
@@ -303,15 +303,15 @@
         <div class="stats">
             <div class="stat-card">
                 <h3 id="total-votes">-</h3>
-                <p>Total Votes</p>
+                <p>Time Left</p>
             </div>
             <div class="stat-card">
                 <h3 id="total-stake">-</h3>
-                <p>Total Voted Stake</p>
+                <p>Voted Stake out of 93M Algo commited</p>
             </div>
             <div class="stat-card">
                 <h3 id="unique-voters">-</h3>
-                <p>Unique Voters</p>
+                <p>Unique Voters out of 2,108 registered</p>
             </div>
             <div class="stat-card">
                 <h3 id="participation-rate">-</h3>
@@ -326,7 +326,7 @@
             <div class="chart-wrapper" id="racing-bar-chart-wrapper">
                 <h2 class="chart-title">Scoreboard</h2>
                 <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                    <button id="racing-bar-play-btn" style="padding: 8px 24px; border-radius: 6px; border: 1px solid #48D1CC; background: #181818; color: #20B2AA; font-size: 1rem; cursor: pointer;">Play</button>
+                    <button id="racing-bar-play-btn" style="padding: 8px 24px; border-radius: 6px; border: 1px solid #48D1CC; background: transparent; color: #20B2AA; font-size: 1rem; cursor: pointer;">Play</button>
                 </div>
                 <div style="display: flex; justify-content: center; margin-bottom: 20px;">
                     <span id="racing-bar-time-counter" style="color: #20B2AA; font-size: 1.1rem; font-weight: bold;">Time: 0</span>
@@ -334,12 +334,12 @@
                 <div style="display: flex; justify-content: center; margin-bottom: 20px;">
                     <span id="racing-bar-progress" style="color: #48D1CC; font-size: 0.9rem;">Progress: 0%</span>
                 </div>
-                <div id="racing-bar-chart" style="width: 100%; height: 1000px; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
+                <div id="racing-bar-chart" style="width: 100%; height: 1000px; background: transparent; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
             </div>
             <div class="chart-wrapper">
                 <h3 class="chart-title">Candidate Voting per Voter Account</h3>
                 <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                    <select id="candidate-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: #181818; color: #20B2AA; outline: none; transition: border-color 0.2s;">
+                    <select id="candidate-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: transparent; color: #20B2AA; outline: none; transition: border-color 0.2s;">
                         <option value="">Select a candidate...</option>
                     </select>
                 </div>
@@ -364,7 +364,7 @@
             <div class="chart-container">
                 <h2 class="chart-title">Non-Voters by Stake</h2>
                 <p class="chart-description">Voters who have not cast their vote yet, sorted by their stake amount</p>
-                <div id="non-voters-chart" class="non-voters-chart" style="height: 600px; width: 100%; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);">
+                <div id="non-voters-chart" class="non-voters-chart" style="height: 600px; width: 100%; background: transparent; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);">
                     <div class="loading">Loading non-voters data...</div>
                 </div>
             </div>
@@ -375,9 +375,9 @@
                 <h2 class="chart-title">Stake Size Voting Breakdown by Candidate</h2>
                 <p class="chart-description">Select a candidate to see how different stake size groups voted. Each bar shows the percentage of Yes, No, and Abstain votes per stake group.</p>
                 <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-                    <select id="candidate-breakdown-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: #181818; color: #20B2AA; outline: none; transition: border-color 0.2s;"></select>
+                    <select id="candidate-breakdown-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: transparent; color: #20B2AA; outline: none; transition: border-color 0.2s;"></select>
                 </div>
-                <div id="stake-vote-breakdown-chart" style="width: 100%; height: 500px; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
+                <div id="stake-vote-breakdown-chart" style="width: 100%; height: 500px; background: transparent; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
             </div>
         </div>
 

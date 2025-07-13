@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20.8.0",
     "typescript": "^5.2.2",
     "vite": "^4.5.0"
@@ -24,6 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
+    "canvas-confetti": "^1.9.3",
     "echarts": "^5.6.0"
   }
 }
