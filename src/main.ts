@@ -143,7 +143,7 @@ class VotingVisualization {
     let winners: string[] = [];
     if (this.racingBarData && this.racingBarData.candidates && this.racingBarData.series) {
       const latestIdx = this.racingBarData.timestamps.length - 1;
-      const frameData = this.racingBarData.candidates.map((c: string, i: number) => ({
+      const frameData = this.racingBarData.candidates.map((c: string, _: number) => ({
         name: c,
         value: this.racingBarData!.series[c][latestIdx],
       }));
