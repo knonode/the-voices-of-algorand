@@ -149,29 +149,18 @@ class StatisticsVisualization {
     // Define stake buckets
     const buckets = [
       { min: 0, max: 100, label: '0-100' },
-      { min: 101, max: 1000, label: '101-1,000' },
-      { min: 1001, max: 10000, label: '1,001-10,000' },
-      { min: 10001, max: 100000, label: '10,001-100,000' },
-      { min: 100001, max: 1000000, label: '100,001-1,000,000' },
-      { min: 1000001, max: 10000000, label: '1,000,001-10,000,000' },
-      { min: 10000001, max: 100000000, label: '10,000,001-100,000,000' }
+      { min: 101, max: 1000, label: '100-1K' },
+      { min: 1001, max: 10000, label: '1K-10K' },
+      { min: 10001, max: 100000, label: '10K-100K' },
+      { min: 100001, max: 1000000, label: '100K-1M' },
+      { min: 1000001, max: 10000000, label: '1M-10M' },
+      { min: 10000001, max: 100000000, label: '10M-100M' }
     ];
     // Helper to format stake
     function formatStake(val: number): string {
       if (val >= 1_000_000) return (val / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
       if (val >= 1_000) return (val / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
       return val.toString();
-    }
-    // Helper to format bucket label
-    function formatBucketLabel(label: string): string {
-      // e.g. '10,001-100,000' => '10K-100K', '1,000,001-10,000,000' => '1M-10M'
-      const match = label.match(/(\d{1,3}(?:,\d{3})*|\d+)-(\d{1,3}(?:,\d{3})*|\d+)/);
-      if (match) {
-        const left = formatStake(parseInt(match[1].replace(/,/g, '')));
-        const right = formatStake(parseInt(match[2].replace(/,/g, '')));
-        return `${left}-${right}`;
-      }
-      return label;
     }
     // Group votes by bucket
     const bucketData = buckets.map(bucket => {
@@ -182,11 +171,12 @@ class StatisticsVisualization {
         totalStake,
         yesStake: votesInBucket.filter(v => v.vote === 'yes').reduce((sum, v) => sum + v.stake, 0),
         noStake: votesInBucket.filter(v => v.vote === 'no').reduce((sum, v) => sum + v.stake, 0),
-        abstainStake: votesInBucket.filter(v => v.vote === 'abstain').reduce((sum, v) => sum + v.stake, 0)
+        abstainStake: votesInBucket.filter(v => v.vote === 'abstain').reduce((sum, v) => sum + v.stake, 0),
+        voterCount: votesInBucket.length
       };
     });
     // Prepare Marimekko-style data
-    const labels = bucketData.map(b => formatBucketLabel(b.label));
+    const labels = bucketData.map(b => b.label);
     // For each bucket, calculate segment proportions
     const marimekkoData = bucketData.map(b => {
       const total = b.yesStake + b.noStake + b.abstainStake;
@@ -198,7 +188,8 @@ class StatisticsVisualization {
         abstain: total ? b.abstainStake / total : 0,
         yesAbs: b.yesStake,
         noAbs: b.noStake,
-        abstainAbs: b.abstainStake
+        abstainAbs: b.abstainStake,
+        voterCount: b.voterCount
       };
     });
     this.stakeBreakdownChart = echarts.init(container);
@@ -208,10 +199,16 @@ class StatisticsVisualization {
         formatter: (params: any) => {
           const idx = params.dataIndex;
           const b = marimekkoData[idx];
-          return `<b>${formatBucketLabel(b.label)}</b><br/>Total stake: ${formatStake(b.totalStake)} ALGO` +
-            `<br/>Yes: ${formatStake(b.yesAbs)} (${(b.yes * 100).toFixed(1)}%)` +
-            `<br/>No: ${formatStake(b.noAbs)} (${(b.no * 100).toFixed(1)}%)` +
-            `<br/>Abstain: ${formatStake(b.abstainAbs)} (${(b.abstain * 100).toFixed(1)}%)`;
+          // Helper to format Yes/No/Abstain as <1K if under 1000
+          function formatSmallStake(val: number): string {
+            if (val > 0 && val < 1000) return '<1K';
+            return formatStake(val);
+          }
+          return `<b>${b.label}</b><br/>Total stake: ${formatStake(b.totalStake)} ALGO` +
+            `<br/>Voters: ${b.voterCount}` +
+            `<br/>Yes: ${formatSmallStake(b.yesAbs)} (${(b.yes * 100).toFixed(1)}%)` +
+            `<br/>No: ${formatSmallStake(b.noAbs)} (${(b.no * 100).toFixed(1)}%)` +
+            `<br/>Abstain: ${formatSmallStake(b.abstainAbs)} (${(b.abstain * 100).toFixed(1)}%)`;
         }
       },
       legend: { data: ['Yes', 'No', 'Abstain'], top: 10, textStyle: { color: '#20B2AA' } },
@@ -225,7 +222,6 @@ class StatisticsVisualization {
       },
       yAxis: {
         type: 'log',
-        name: 'Stake (ALGO)',
         min: 1,
         max: 50000000,
         axisLabel: { color: '#20B2AA', formatter: (value: number) => formatStake(value) },

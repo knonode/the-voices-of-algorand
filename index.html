@@ -119,11 +119,8 @@
         }
 
         .charts-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(800px, 1fr));
-            gap: 30px;
+            display: block;
             margin-bottom: 40px;
-            overflow-x: auto;
         }
 
         .chart-wrapper {
@@ -134,6 +131,7 @@
             height: auto;
             position: relative;
             overflow: hidden;
+            margin-bottom: 40px;
         }
 
         .chart-title {
@@ -145,6 +143,13 @@
         }
 
         .chart-address {
+            text-align: center;
+            color: #20B2AA;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+        }
+
+        .chart-description {
             text-align: center;
             color: #20B2AA;
             font-size: 0.95rem;
@@ -291,13 +296,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏛️ xGov Council Voting</h1>
+            <h1>⚖️ xGov Council Voting</h1>
             <p>Real-time visualization of on-chain governance</p>
-        </div>
-
-        <div class="nav-links">
-            <a href="index.html" class="active">Voting Visualization</a>
-            <a href="statistics.html">Election Statistics</a>
         </div>
 
         <div class="stats">
@@ -323,7 +323,62 @@
         </div>
 
         <div id="charts-container" class="charts-container">
-            <div class="loading">Loading voting data...</div>
+            <div class="chart-wrapper" id="racing-bar-chart-wrapper">
+                <h2 class="chart-title">Scoreboard</h2>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <button id="racing-bar-play-btn" style="padding: 8px 24px; border-radius: 6px; border: 1px solid #48D1CC; background: #181818; color: #20B2AA; font-size: 1rem; cursor: pointer;">Play</button>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <span id="racing-bar-time-counter" style="color: #20B2AA; font-size: 1.1rem; font-weight: bold;">Time: 0</span>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <span id="racing-bar-progress" style="color: #48D1CC; font-size: 0.9rem;">Progress: 0%</span>
+                </div>
+                <div id="racing-bar-chart" style="width: 100%; height: 1000px; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
+            </div>
+            <div class="chart-wrapper">
+                <h3 class="chart-title">Candidate Voting per Voter Account</h3>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <select id="candidate-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: #181818; color: #20B2AA; outline: none; transition: border-color 0.2s;">
+                        <option value="">Select a candidate...</option>
+                    </select>
+                </div>
+                <div id="candidate-info" style="text-align: center; margin-bottom: 20px; display: none;">
+                    <div id="candidate-address" class="chart-address"></div>
+                </div>
+                <div id="charts-grid" class="charts-grid" style="display: none;">
+                    <div id="stake-chart-container" class="stake-chart"></div>
+                    <div id="popularity-wrapper" class="popularity-wrapper" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                        <div id="popularity-title" class="popularity-title" style="color: #20B2AA; font-weight: bold; font-size: 1.2rem; margin-bottom: 4px;">Popular vote</div>
+                        <div id="popularity-counts" class="popularity-counts" style="color: #aaa; font-size: 1rem; margin-bottom: 8px;"></div>
+                        <div id="popularity-chart-container" class="popularity-chart"></div>
+                    </div>
+                </div>
+                <div id="no-votes-message" style="text-align: center; color: #888; font-size: 1.1rem; margin-top: 120px; display: none;">
+                    No votes yet
+                </div>
+            </div>
+        </div>
+        <!-- Non-Voters by Stake Chart -->
+        <div class="chart-wrapper">
+            <div class="chart-container">
+                <h2 class="chart-title">Non-Voters by Stake</h2>
+                <p class="chart-description">Voters who have not cast their vote yet, sorted by their stake amount</p>
+                <div id="non-voters-chart" class="non-voters-chart" style="height: 600px; width: 100%; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);">
+                    <div class="loading">Loading non-voters data...</div>
+                </div>
+            </div>
+        </div>
+        <!-- Stake Size Voting Breakdown by Candidate Chart -->
+        <div class="chart-wrapper">
+            <div class="chart-container">
+                <h2 class="chart-title">Stake Size Voting Breakdown by Candidate</h2>
+                <p class="chart-description">Select a candidate to see how different stake size groups voted. Each bar shows the percentage of Yes, No, and Abstain votes per stake group.</p>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                    <select id="candidate-breakdown-dropdown" style="min-width: 250px; padding: 8px; border-radius: 6px; border: 1px solid #48D1CC; font-size: 1rem; background: #181818; color: #20B2AA; outline: none; transition: border-color 0.2s;"></select>
+                </div>
+                <div id="stake-vote-breakdown-chart" style="width: 100%; height: 500px; background: #181818; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.12);"></div>
+            </div>
         </div>
 
         <div class="last-updated">

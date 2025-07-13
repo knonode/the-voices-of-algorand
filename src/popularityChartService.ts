@@ -36,7 +36,6 @@ export class PopularityChartService {
       const order = { yes: 0, abstain: 1, no: 2, none: 3 };
       return order[a.vote] - order[b.vote];
     });
-    console.log('Unique vote types:', Array.from(new Set(pixelData.map(p => p.vote))));
     // Map vote types to numbers for visualMap
     const voteTypeToNum = { yes: 0, abstain: 1, no: 2, none: 3 } as const;
     // Grid layout (denser grid)
@@ -56,8 +55,6 @@ export class PopularityChartService {
       const voteText = pixel.vote === 'none' ? 'No vote' : pixel.vote.charAt(0).toUpperCase() + pixel.vote.slice(1);
       data.push([col, row, voteTypeToNum[pixel.vote], voterAddress, voteText, pixel.vote]);
     });
-    console.table(data.slice(0, 10));
-    console.log('Vote value counts:', data.reduce((acc: Record<number, number>, d) => { acc[d[2]] = (acc[d[2]] || 0) + 1; return acc; }, {} as Record<number, number>));
     // Count votes for subtitle
     const yesCount = pixelData.filter(p => p.vote === 'yes').length;
     const abstainCount = pixelData.filter(p => p.vote === 'abstain').length;

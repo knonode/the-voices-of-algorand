@@ -100,7 +100,7 @@ export class VotingService {
           candidate: CANDIDATES[i].name,
           vote: voteType,
           stake: 0, // Will be populated from registration weights
-          timestamp: tx['round-time'],
+          timestamp: tx['round-time'] * 1000,
           transactionId: tx.id
         });
       }
