@@ -11,8 +11,7 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        statistics: resolve(__dirname, 'statistics.html') // use root-level statistics.html for output to dist/
+        main: resolve(__dirname, 'index.html')
       }
     }
   },
