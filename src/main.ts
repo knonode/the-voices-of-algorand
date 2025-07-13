@@ -3,6 +3,7 @@ import { EChartsService } from './echartsService';
 import { PopularityChartService } from './popularityChartService';
 import { StatisticsService } from './statisticsService';
 import { Candidate, Vote } from './types';
+import { Analytics } from "@vercel/analytics/next"
 import * as echarts from 'echarts';
 import confetti from 'canvas-confetti';
 
