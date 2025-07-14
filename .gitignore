@@ -33,3 +33,4 @@ coverage/
 src/candidateVotesApi.ts
 src/candidateVotesPage.html 
 .vercel
+.plan.md

@@ -1,24 +1,22 @@
 # xGov Council Voting Visualization
 
-A real-time visualization of on-chain voting for the xGov council election on Algorand. This application fetches voting transactions from the xGov voting account and displays them as interactive charts showing voting patterns, stake distribution, and democratic governance in action.
+A real-time visualization of on-chain voting for the xGov council election on Algorand. This application fetches voting transactions from the xGov voting account, processes them using committed amounts from CSV, and displays interactive charts using ECharts to show voting patterns, stake distribution, and governance metrics.
 
 ## Features
 
 - **Real-time Data**: Fetches voting data from Algorand blockchain using Nodely API
-- **Interactive Charts**: Individual charts for each candidate showing voter distribution
-- **Stake-based Visualization**: Column charts with stacked yes/no/abstain votes
-- **Hover Details**: Shows truncated voter addresses and stake amounts on hover
-- **Dark Theme**: Beautiful dark UI with teal highlights and pastel colors
-- **Auto-refresh**: Updates data every hour automatically
+- **Interactive Charts**: 
+  - Scoreboard: Animated racing bar chart showing net yes stake over time
+  - Stake-Weighted Chart: Bar chart per candidate with yes/no/abstain stakes (log scale)
+  - Popularity Chart: Pixel scatter plot showing individual votes
+  - Non-Voters Chart: Shows non-voters by stake
+  - Stake Breakdown Chart: Marimekko chart of votes by stake buckets
+- **Statistics Cards**: Display time left, voted stake, unique voters, participation rate
+- **Auto-refresh**: Updates data every hour automatically and on reload
 - **Responsive Design**: Works on desktop and mobile devices
+- **Animations**: Confetti on voting end, playback for scoreboard
+- **Copy Address**: Click on displayed addresses to copy full voter or candidate addresses to clipboard
 
-## Color Scheme
-
-- **Background**: Dark gray (rgb(18, 18, 18))
-- **Primary**: Teal variations (#008080, #20B2AA, #48D1CC)
-- **Yes Votes**: Soft green (#90EE90)
-- **No Votes**: Soft red (#FFB6C1)
-- **Abstain**: Soft yellow (#F0E68C)
 
 ## Setup Instructions
 
@@ -59,63 +57,62 @@ The built files will be in the `dist` directory.
 
 ### Data Flow
 
-1. **Transaction Fetching**: The app fetches all transactions from the xGov voting account (`RW466IANOKLA36QARHMBX5VCY3PYDR3H2N5XHPDARG6UBOKCIK7WAMLSCA`)
-
-2. **Note Parsing**: Transaction notes are decoded and parsed to extract:
-   - Vote type (a=yes, b=no, c=abstain)
-   - Candidate index (1-20)
-
-3. **Balance Fetching**: For each unique voter, the app fetches their current ALGO balance to determine voting weight
-
-4. **Data Processing**: Votes are grouped by candidate and voter, with stakes calculated
-
-5. **Visualization**: Chart.js creates interactive stacked bar charts for each candidate
+1. **Load Committed Amounts**: Reads `commit-amount.csv` for voter stakes in Algos
+2. **Transaction Fetching**: Fetches transactions from xGov voting account (`RW466IANOKLA36QARHMBX5VCY3PYDR3H2N5XHPDARG6UBOKCIK7WAMLSCA`) starting from block 51363025
+3. **Note Parsing**: Decodes Base64 notes, parses JSON arrays for votes across all candidates (a=yes, b=no, c=abstain)
+4. **Process Latest Votes**: Keeps only the most recent vote per voter
+5. **Assign Stakes**: Maps stakes from CSV to votes
+6. **Data Aggregation**: Groups by candidates, calculates totals
+7. **Visualization**: Uses ECharts to render various interactive charts
 
 ### API Usage
 
-The application uses the Nodely Algorand API (free tier) with rate limiting:
+The application uses the Nodely Algorand Indexer API with rate limiting:
 - 20 requests per second maximum
 - No API key required
 - Endpoints used:
   - `/v2/accounts/{address}/transactions` - Fetch voting transactions
-  - `/v2/accounts/{address}` - Fetch voter balances
+  - Governance API for voting periods
 
 ### Voting Format
 
-Transaction notes follow the format: `{vote_type}.{candidate_index}`
-- `a.1` = Yes vote for candidate 1
-- `b.5` = No vote for candidate 5
-- `c.10` = Abstain for candidate 10
+Transaction notes are Base64 encoded JSON: `af/gov1:j[period, "a"/"b"/"c" for each candidate]`
+- Array index corresponds to candidate (1-23)
+- "a" = Yes, "b" = No, "c" = Abstain
 
 ## Project Structure
 
 ```
 src/
-├── types.ts           # TypeScript interfaces
-├── candidates.ts      # Candidate data and note parsing
-├── api.ts            # Algorand API service with rate limiting
-├── votingService.ts  # Core voting data processing
-├── chartService.ts   # Chart.js visualization logic
-└── main.ts          # Main application entry point
+├── api.ts                    # Algorand API service with rate limiting
+├── candidates.ts             # List of candidates
+├── echartsService.ts         # Stake-weighted chart creation
+├── main.ts                   # Main application entry point and visualization logic
+├── popularityChartService.ts # Popularity pixel chart creation
+├── statistics.ts             # Statistics visualization (partial overlap with main)
+├── statisticsService.ts      # Statistics computation
+├── types.ts                  # TypeScript interfaces
+├── votingService.ts          # Voting data fetching and processing
 ```
 
 ## Technical Details
 
 ### Rate Limiting
 
-The application implements a sliding window rate limiter to respect the Nodely API's 20 requests/second limit.
+Implements a sliding window rate limiter (20 requests/second) for Nodely API.
 
 ### Error Handling
 
 - Graceful handling of API failures
-- Fallback for missing voter balances
 - User-friendly error messages
+- Console logging for debugging
 
 ### Performance
 
-- Efficient data processing with Map data structures
-- Lazy loading of chart components
-- Memory cleanup on page unload
+- Uses Maps for efficient data processing
+- Chart disposal for memory management
+- Rate limiting to prevent API overload
+- CSV for stake data to avoid per-voter queries
 
 ## Contributing
 
@@ -131,7 +128,4 @@ MIT License - see LICENSE file for details
 
 ## Acknowledgments
 
-- Algorand Foundation for xGov governance
 - Nodely for providing free Algorand API access
-- Chart.js for the visualization library
-- The Algorand community for on-chain governance innovation 
