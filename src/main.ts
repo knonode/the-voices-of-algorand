@@ -1124,7 +1124,7 @@ class VotingVisualization {
     this.updateProgressIndicator(timestamps[latestIdx]);
     
     // Build and sort data by net votes descending
-    this.popularityData = candidates.map((c: string, i: number) => ({ 
+    this.popularityData = candidates.map((c: string) => ({ 
       name: c, 
       value: series[c][latestIdx], 
       color: series[c][latestIdx] < 0 ? '#FF6B6B' : '#90EE90'
