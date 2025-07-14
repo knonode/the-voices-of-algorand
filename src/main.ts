@@ -17,6 +17,9 @@ class VotingVisualization {
   private updateInterval: number | null = null;
   private racingBarChart: echarts.ECharts | null = null;
   private racingBarData: { timestamps: number[]; candidates: string[]; series: Record<string, number[]> } | null = null;
+  private popularityData: { name: string; value: number; color: string }[] | null = null; // Property for final popularity data
+  private popularityRacingData: { timestamps: number[]; candidates: string[]; series: Record<string, number[]> } | null = null; // New property for time-series popularity data
+  private isPopularityView: boolean = false; // Property to track current view mode
   private racingBarTimer: number | null = null;
   private votingPeriod: { start: number; end: number } | null = null;
   private countdownInterval: number | null = null;
@@ -35,6 +38,9 @@ class VotingVisualization {
       this.setupCandidateDropdown();
       this.setupBreakdownDropdown();
       this.setupAutoRefresh();
+      this.setupPopularVoteToggle();
+      this.startCountdownTimer();
+      this.createNonVotersChart();
     } catch (error) {
       this.showError('Failed to initialize voting visualization: ' + error);
     }
@@ -44,19 +50,16 @@ class VotingVisualization {
     try {
       this.showLoading(true);
       await this.votingService.fetchAndProcessVotes();
-      this.updateStats();
-      this.updateLastUpdated();
-      this.createNonVotersChart();
-      this.setupBreakdownDropdown();
       await this.fetchVotingPeriod();
       this.prepareRacingBarData();
+      this.preparePopularityRacingData(); // Add this line to prepare popularity data
+      this.updateStats();
       this.initRacingBarChart();
-      this.setupRacingBarPlayButton();
-      this.startCountdownTimer();
+      this.setupRacingBarPlayButton(); // Add this line to initialize the play button
       this.showLoading(false);
     } catch (error) {
-      this.showError('Failed to load voting data: ' + error);
       this.showLoading(false);
+      this.showError('Failed to load voting data: ' + error);
     }
   }
 
@@ -444,7 +447,7 @@ class VotingVisualization {
     const totalNonVoteStake = nonVoters.reduce((sum, nonVoter) => sum + nonVoter.stake, 0);
     const chartTitleEl = container.parentElement?.querySelector('.chart-title');
     if (chartTitleEl) {
-      chartTitleEl.textContent = `Non-Voters by Stake (Total: ${totalNonVoteStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ALGO)`;
+      chartTitleEl.textContent = `Non-Voters by Stake (Total: ${totalNonVoteStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Algo)`;
     }
     this.nonVotersChart = this.statisticsService.createNonVotersChart(container, this.votingService);
     window.addEventListener('resize', () => {
@@ -535,7 +538,7 @@ class VotingVisualization {
             if (val > 0 && val < 1000) return '<1K';
             return formatStake(val);
           }
-          return `<b>${b.label}</b><br/>Total stake: ${formatStake(b.totalStake)} ALGO` +
+          return `<b>${b.label}</b><br/>Total stake: ${formatStake(b.totalStake)}` +
             `<br/>Voters: ${b.voterCount}` +
             `<br/>Yes: ${formatSmallStake(b.yesAbs)} (${(b.yes * 100).toFixed(1)}%)` +
             `<br/>No: ${formatSmallStake(b.noAbs)} (${(b.no * 100).toFixed(1)}%)` +
@@ -679,6 +682,52 @@ class VotingVisualization {
     console.log('prepareRacingBarData:', this.racingBarData);
   }
 
+  private preparePopularityRacingData(): void {
+    if (!this.votingPeriod) return;
+    const { start, end } = this.votingPeriod;
+    const votes = this.votingService.getVotes();
+    const candidates: string[] = Array.from(new Set(votes.map((v: any) => v.candidate)));
+    
+    // Use the same timestamps as the stake-weighted chart for consistency
+    const targetFrames = 200;
+    const interval = Math.max(Math.floor((end - start) / targetFrames), 5 * 60 * 1000);
+    const timestamps: number[] = [];
+    const now = Date.now();
+    for (let t = start; t <= Math.min(end, now); t += interval) {
+      timestamps.push(t);
+    }
+    
+    console.log(`Created ${timestamps.length} time buckets for popularity data`);
+    
+    // For each candidate, build net unique (YES - NO) voter counts at each timestamp
+    const series: Record<string, number[]> = {};
+    candidates.forEach((candidate: string) => {
+      const uniqueYesAtTimestamp: Set<number>[] = timestamps.map(() => new Set<number>());
+      const uniqueNoAtTimestamp: Set<number>[] = timestamps.map(() => new Set<number>());
+      
+      // Get all YES and NO votes for this candidate, sorted by timestamp
+      const candidateVotes = votes
+        .filter((v: any) => v.candidate === candidate && (v.vote === 'yes' || v.vote === 'no'))
+        .sort((a: any, b: any) => a.timestamp - b.timestamp);
+      
+      candidateVotes.forEach(vote => {
+        const voterID = vote.voter;
+        const voteTime = vote.timestamp;
+        const startIdx = timestamps.findIndex(t => t >= voteTime);
+        if (startIdx === -1) return;
+        for (let i = startIdx; i < timestamps.length; i++) {
+          if (vote.vote === 'yes') uniqueYesAtTimestamp[i].add(voterID);
+          if (vote.vote === 'no') uniqueNoAtTimestamp[i].add(voterID);
+        }
+      });
+      // Net unique votes = YES - NO
+      series[candidate] = uniqueYesAtTimestamp.map((yesSet, i) => yesSet.size - uniqueNoAtTimestamp[i].size);
+    });
+    
+    this.popularityRacingData = { timestamps, candidates, series };
+    console.log('preparePopularityRacingData:', this.popularityRacingData);
+  }
+
   private getCandidateColor(_name: string, index: number): string {
     // Muted, pastel, semi-transparent palette (alpha 0.5)
     const pastelPalette = [
@@ -779,47 +828,64 @@ class VotingVisualization {
     this.updateProgressIndicator(timestamps[latestIdx]);
     
     // Build and sort data by net yes stake descending (highest at top)
-    const frameData = candidates.map((c: string, i: number) => ({ name: c, value: series[c][latestIdx], color: this.getCandidateColor(c, i) }));
+    const frameData = candidates.map((c: string, i: number) => {
+      const value = series[c][latestIdx];
+      return {
+        name: c,
+        value,
+        color: value < 0 ? '#FF6B6B' : '#90EE90',
+        stake: value
+      };
+    });
     frameData.sort((a, b) => b.value - a.value);
-    frameData.reverse(); // Highest at top
     // Insert separator between rank 11 and 12
     const sortedCandidates = frameData.map(d => d.name);
     if (sortedCandidates.length > 11) {
       sortedCandidates.splice(11, 0, '---COUNCIL_SEAT_CUTOFF---');
-      frameData.splice(11, 0, { name: '---COUNCIL_SEAT_CUTOFF---', value: 0.0001, color: 'rgba(0,0,0,0.01)' });
+      frameData.splice(11, 0, { name: '---COUNCIL_SEAT_CUTOFF---', value: 0, color: 'rgba(0,0,0,0.01)', stake: 0 });
     }
+    // Find max absolute value for axis
+    const maxAbs = Math.max(1, ...frameData.map(d => Math.abs(d.value)));
     this.racingBarChart = echarts.init(container);
     const option: echarts.EChartsOption = {
       grid: { left: 40, right: 40, top: 60, bottom: 40, containLabel: true },
       xAxis: {
         type: 'value',
         min: 0,
-        max: 1,
-        show: false
+        max: Math.ceil(maxAbs * 1.1),
+        show: true,
+        axisLabel: {
+          color: '#20B2AA',
+          formatter: (val: number) => this.formatStake(val)
+        }
       },
       yAxis: {
         type: 'category',
         data: sortedCandidates,
-        axisLabel: { show: false },
-        axisLine: { show: false },
-        splitLine: { show: false }
+        inverse: true,
+        axisLabel: { color: '#20B2AA' }
       },
       series: [{
         type: 'bar',
-        data: frameData.map(d => ({ name: d.name, value: 1, itemStyle: { color: d.color }, stake: d.value })),
+        data: frameData.map(d => ({
+          value: Math.abs(d.value),
+          itemStyle: {
+            color: d.name === '---COUNCIL_SEAT_CUTOFF---' ? 'rgba(0,0,0,0.01)' : d.color
+          },
+          stake: d.stake
+        })),
         barCategoryGap: '30%',
-        itemStyle: { borderRadius: [8, 8, 8, 8] },
+        itemStyle: { borderRadius: 0 },
         label: {
           show: true,
-          position: 'inside',
-          align: 'center',
-          color: '#20B2AA',
-          fontSize: 16,
+          position: 'right',
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontWeight: 'normal',
+          fontFamily: 'inherit',
           formatter: (params: any) => {
-            if (params.name === '---COUNCIL_SEAT_CUTOFF---') {
-              return '';
-            }
-            return `${params.name}  ${this.formatStake(params.data.stake)}`;
+            if (params.name === '---COUNCIL_SEAT_CUTOFF---') return '';
+            return `${params.data.stake >= 0 ? '' : '-'}${this.formatStake(Math.abs(params.data.stake))}`;
           }
         },
         z: 2,
@@ -859,70 +925,338 @@ class VotingVisualization {
         return;
       }
       btn.textContent = 'Pause';
-      let frame = 0;
-      const { candidates, series, timestamps } = this.racingBarData as { timestamps: number[]; candidates: string[]; series: Record<string, number[]> };
-      // Reset progress indicator to 0% (start of voting period)
-      this.updateProgressIndicator(timestamps[0]);
-      this.racingBarTimer = window.setInterval(() => {
-        if (!this.racingBarChart) return;
-        if (frame >= timestamps.length) {
-          clearInterval(this.racingBarTimer!);
-          this.racingBarTimer = null;
-          btn.textContent = 'Play';
-          return;
-        }
-        // Update time counter with current frame timestamp
-        this.updateTimeCounter(timestamps[frame]);
-        // Update progress indicator based on current timestamp
-        this.updateProgressIndicator(timestamps[frame]);
-        // Build and sort data by net yes stake descending (highest at top)
-        const frameData = candidates.map((c: string, i: number) => ({ name: c, value: series[c][frame], color: this.getCandidateColor(c, i) }));
-        frameData.sort((a, b) => b.value - a.value);
-        frameData.reverse(); // Highest at top
-        // Insert separator between rank 11 and 12
-        const sortedCandidates = frameData.map(d => d.name);
-        if (sortedCandidates.length > 11) {
-          sortedCandidates.splice(11, 0, '---COUNCIL_SEAT_CUTOFF---');
-          frameData.splice(11, 0, { name: '---COUNCIL_SEAT_CUTOFF---', value: 0.0001, color: 'rgba(0,0,0,0.01)' });
-        }
-        this.racingBarChart.setOption({
-          yAxis: { data: sortedCandidates, axisLabel: { show: false }, axisLine: { show: false }, splitLine: { show: false } },
-          series: [{
-            type: 'bar',
-            data: frameData.map(d => ({ name: d.name, value: 1, itemStyle: { color: d.color }, stake: d.value })),
-            label: {
-              show: true,
-              position: 'inside',
-              align: 'center',
-              color: '#20B2AA',
-              fontWeight: 'bold',
-              fontSize: 16,
-              formatter: (params: any) => {
-                if (params.name === '---COUNCIL_SEAT_CUTOFF---') {
-                  return '';
-                }
-                return `${params.name}  ${this.formatStake(params.data.stake)}`;
-              }
-            },
-            markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
-              symbol: ['none', 'none'],
-              lineStyle: {
-                color: '#096b4f',
-                width: 3,
-                type: 'solid'
-              },
-              data: [
-                {
-                  yAxis: '---COUNCIL_SEAT_CUTOFF---',
-                  label: { show: false }
-                }
-              ]
-            } : undefined
-          }]
-        });
-        frame++;
-      }, 500);
+      
+      // Different animation logic based on the current view
+      if (this.isPopularityView) {
+        this.animatePopularityChart();
+      } else {
+        this.animateStakeWeightedChart();
+      }
     };
+  }
+  
+  private animateStakeWeightedChart(): void {
+    if (!this.racingBarData || !this.racingBarChart) return;
+    
+    let frame = 0;
+    const { candidates, series, timestamps } = this.racingBarData;
+    
+    // Reset progress indicator to 0% (start of voting period)
+    this.updateProgressIndicator(timestamps[0]);
+    
+    this.racingBarTimer = window.setInterval(() => {
+      if (!this.racingBarChart) return;
+      if (frame >= timestamps.length) {
+        clearInterval(this.racingBarTimer!);
+        this.racingBarTimer = null;
+        const btn = document.getElementById('racing-bar-play-btn');
+        if (btn) btn.textContent = 'Play';
+        return;
+      }
+      
+      // Update time counter with current frame timestamp
+      this.updateTimeCounter(timestamps[frame]);
+      
+      // Update progress indicator based on current timestamp
+      this.updateProgressIndicator(timestamps[frame]);
+      
+      // Build and sort data by net yes stake (yes - no) descending
+      const frameData = candidates.map((c: string, i: number) => {
+        const value = series[c][frame];
+        return {
+          name: c,
+          value,
+          color: value < 0 ? '#FF6B6B' : '#90EE90',
+          stake: value
+        };
+      });
+      frameData.sort((a, b) => b.value - a.value);
+      
+      // Insert separator between rank 11 and 12 (council seat cutoff)
+      const sortedCandidates = frameData.map(d => d.name);
+      if (sortedCandidates.length > 11 && !sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---')) {
+        sortedCandidates.splice(11, 0, '---COUNCIL_SEAT_CUTOFF---');
+        frameData.splice(11, 0, {
+          name: '---COUNCIL_SEAT_CUTOFF---',
+          value: 0,
+          color: 'rgba(0,0,0,0.01)',
+          stake: 0
+        });
+      }
+      // Find max absolute value for axis
+      const maxAbs = Math.max(1, ...frameData.map(d => Math.abs(d.value)));
+      this.racingBarChart.setOption({
+        xAxis: {
+          type: 'value',
+          min: 0,
+          max: Math.ceil(maxAbs * 1.1),
+          show: true,
+          axisLabel: {
+            color: '#20B2AA',
+            formatter: (val: number) => this.formatStake(val)
+          }
+        },
+        yAxis: {
+          type: 'category',
+          data: sortedCandidates,
+          inverse: true,
+          axisLabel: {
+            color: '#20B2AA',
+          }
+        },
+        series: [{
+          type: 'bar',
+          data: frameData.map(d => ({
+            value: Math.abs(d.value),
+            itemStyle: {
+              color: d.name === '---COUNCIL_SEAT_CUTOFF---' ? 'rgba(0,0,0,0.01)' : d.color
+            },
+            stake: d.stake
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (params: any) => {
+              if (params.name === '---COUNCIL_SEAT_CUTOFF---') return '';
+              return `${params.data.stake >= 0 ? '' : '-'}${this.formatStake(Math.abs(params.data.stake))}`;
+            },
+            color: '#FFFFFF'
+          },
+          markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
+            symbol: ['none', 'none'],
+            lineStyle: {
+              color: '#096b4f',
+              width: 3,
+              type: 'solid'
+            },
+            data: [
+              {
+                yAxis: '---COUNCIL_SEAT_CUTOFF---',
+                label: { show: false }
+              }
+            ]
+          } : undefined
+        }]
+      });
+      
+      frame++;
+    }, 500);
+  }
+  
+  private animatePopularityChart(): void {
+    if (!this.popularityRacingData || !this.racingBarChart) return;
+    
+    const { timestamps, candidates, series } = this.popularityRacingData;
+    let frame = 0;
+    const totalFrames = timestamps.length;
+    
+    // Reset progress indicator to 0%
+    if (timestamps && timestamps.length > 0) {
+      this.updateProgressIndicator(timestamps[0]);
+    }
+    
+    this.racingBarTimer = window.setInterval(() => {
+      if (!this.racingBarChart || !this.popularityRacingData || frame >= totalFrames) {
+        if (this.racingBarTimer) {
+          clearInterval(this.racingBarTimer);
+          this.racingBarTimer = null;
+          const playBtn = document.getElementById('racing-bar-play-btn');
+          if (playBtn) playBtn.textContent = 'Play';
+        }
+        return;
+      }
+      
+      // Update time counter and progress indicator
+      this.updateTimeCounter(timestamps[frame]);
+      this.updateProgressIndicator(timestamps[frame]);
+      
+      // Build frame data for current timestamp
+      const frameData = candidates.map((c: string) => {
+        const value = series[c][frame];
+        return {
+          name: c,
+          value,
+          color: value < 0 ? '#FF6B6B' : '#90EE90'
+        };
+      });
+      
+      // Sort by net votes (highest at top)
+      frameData.sort((a, b) => b.value - a.value);
+      
+      // No council seat cutoff bar in popular vote leaderboard
+      const sortedCandidates = frameData.map(d => d.name);
+      // Find max absolute value for axis
+      const maxAbs = Math.max(1, ...frameData.map(d => Math.abs(d.value)));
+      // Update chart
+      this.racingBarChart.setOption({
+        xAxis: {
+          type: 'value',
+          min: 0,
+          max: Math.ceil(maxAbs * 1.1),
+          show: true,
+          axisLabel: {
+            color: '#20B2AA',
+          }
+        },
+        yAxis: {
+          type: 'category',
+          data: sortedCandidates,
+          inverse: true,
+          axisLabel: {
+            color: '#20B2AA',
+          }
+        },
+        series: [{
+          type: 'bar',
+          data: frameData.map(d => ({
+            value: Math.abs(d.value),
+            itemStyle: {
+              color: d.color
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (params: any) => `${params.data.value >= 0 ? '' : '-'}${Math.abs(params.data.value)} votes`,
+            color: '#FFFFFF'
+          }
+        }]
+      });
+      
+      frame++;
+    }, 500); // Same interval as stake-weighted animation
+  }
+  
+  // Easing function for smoother animations
+  private easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  private setupPopularVoteToggle(): void {
+    const playButtonContainer = document.querySelector('#racing-bar-chart-wrapper div');
+    if (!playButtonContainer) return;
+    
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'toggle-popular-vote-btn';
+    toggleButton.textContent = 'Show Popular Vote';
+    toggleButton.style.padding = '8px 24px';
+    toggleButton.style.borderRadius = '6px';
+    toggleButton.style.border = '1px solid #48D1CC';
+    toggleButton.style.background = 'transparent';
+    toggleButton.style.color = '#20B2AA';
+    toggleButton.style.fontSize = '1rem';
+    toggleButton.style.cursor = 'pointer';
+    toggleButton.style.marginLeft = '10px';
+    
+    playButtonContainer.appendChild(toggleButton);
+    
+    toggleButton.addEventListener('click', () => {
+      // Stop any running animation
+      if (this.racingBarTimer) {
+        clearInterval(this.racingBarTimer);
+        this.racingBarTimer = null;
+        const playBtn = document.getElementById('racing-bar-play-btn');
+        if (playBtn) playBtn.textContent = 'Play';
+      }
+      
+      const isPopularView = toggleButton.textContent === 'Show Stake Weighted';
+      if (isPopularView) {
+        toggleButton.textContent = 'Show Popular Vote';
+        const titleElement = document.querySelector('#racing-bar-chart-wrapper h2');
+        if (titleElement) titleElement.textContent = 'Stake Weighted Leaderboard';
+        this.isPopularityView = false;
+        this.initRacingBarChart();
+      } else {
+        toggleButton.textContent = 'Show Stake Weighted';
+        const titleElement = document.querySelector('#racing-bar-chart-wrapper h2');
+        if (titleElement) titleElement.textContent = 'Popular Vote Leaderboard';
+        this.isPopularityView = true;
+        this.createPopularVoteLeaderboard();
+      }
+    });
+  }
+
+  private createPopularVoteLeaderboard(): void {
+    const container = document.getElementById('racing-bar-chart');
+    if (!container || !this.popularityRacingData) return;
+    
+    // Dispose existing chart
+    if (this.racingBarChart) this.racingBarChart.dispose();
+    
+    const { candidates, series, timestamps } = this.popularityRacingData;
+    // Show latest frame by default
+    const latestIdx = timestamps.length - 1;
+    
+    // Update time counter with the latest timestamp
+    this.updateTimeCounter(timestamps[latestIdx]);
+    
+    // Update progress indicator to show progress for latest timestamp
+    this.updateProgressIndicator(timestamps[latestIdx]);
+    
+    // Build and sort data by net votes descending
+    this.popularityData = candidates.map((c: string, i: number) => ({ 
+      name: c, 
+      value: series[c][latestIdx], 
+      color: series[c][latestIdx] < 0 ? '#FF6B6B' : '#90EE90'
+    }));
+    
+    // Sort by net votes (highest at top)
+    this.popularityData.sort((a, b) => b.value - a.value);
+    
+    // No council seat cutoff bar in popular vote leaderboard
+    // Find max absolute value for axis
+    const maxAbs = Math.max(1, ...this.popularityData.map(d => Math.abs(d.value)));
+    // Create chart
+    this.racingBarChart = echarts.init(container);
+    
+    const option: echarts.EChartsOption = {
+      grid: { left: 40, right: 40, top: 60, bottom: 40, containLabel: true },
+      xAxis: {
+        type: 'value',
+        min: 0,
+        max: Math.ceil(maxAbs * 1.1), // Add 10% for spacing
+        show: true,
+        axisLabel: {
+          color: '#20B2AA',
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: this.popularityData.map(d => d.name),
+        inverse: true,
+        axisLabel: {
+          color: '#20B2AA',
+        }
+      },
+      series: [
+        {
+          type: 'bar',
+          data: this.popularityData.map(d => ({
+            value: Math.abs(d.value),
+            itemStyle: {
+              color: d.color
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (params: any) => `${params.data.value >= 0 ? '' : '-'}${Math.abs(params.data.value)} votes`,
+            color: '#FFFFFF'
+          }
+        }
+      ],
+      title: {
+        text: 'Popular Vote (Net Unique Voters)',
+        left: 'center',
+        top: 10,
+        textStyle: {
+          color: '#20B2AA',
+          fontSize: 18
+        }
+      }
+    };
+    
+    this.racingBarChart.setOption(option);
   }
 
   public destroy(): void {
@@ -931,6 +1265,9 @@ class VotingVisualization {
     }
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval);
+    }
+    if (this.racingBarTimer) {
+      clearInterval(this.racingBarTimer);
     }
     if (this.confettiTimeout) {
       clearTimeout(this.confettiTimeout);
