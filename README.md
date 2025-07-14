@@ -2,6 +2,18 @@
 
 A real-time visualization of on-chain voting for the xGov council election on Algorand. This application fetches voting transactions from the xGov voting account, processes them using committed amounts from CSV, and displays interactive charts using ECharts to show voting patterns, stake distribution, and governance metrics.
 
+## Rationale
+
+Algorand on-chain governance is fully transparent, in contrast to legacy in-person secret voting in booths. In addition, a voter can change their votes during the voting period. Secret voting creates less bias, but when a voter goes on to the Algorand Governance page and is not fully committed to the context of the voting measures, it is easy to follow the crowd and vote with whatever is winning now. Algorand Governance is built around the "1 Algo = 1 vote" principle and can be heavily influenced by large stakeholders.
+
+Here the transparency of the ledger comes in handy. By exposing the data and visualizing it in understandable charts, the user can make qualified assessments on the voting patterns from individual and bucket stakeholders of different sizes.
+
+The popular vote chart shows that several candidates have more support from stakeholders than the stake-based voting resolves to. The data from the popularity vote chart and stake size buckets can be used to gauge the sentiment of the community on a social level.
+
+The election of the xGov council is not incentivized, so it can be said that the participating stakeholders are based and interested in the future of the Algorand protocol. Voting data can be interpreted as showing an aligned community, mostly in consensus, with an expected amount of outliers and margins.
+
+It will be interesting to see if the project can be adjusted and used for future voting sessions on the xGov platform.
+
 ## Features
 
 - **Real-time Data**: Fetches voting data from Algorand blockchain using Nodely API
