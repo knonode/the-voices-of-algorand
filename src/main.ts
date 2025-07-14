@@ -763,7 +763,7 @@ class VotingVisualization {
     this.updateProgressIndicator(timestamps[latestIdx]);
     
     // Build and sort data by net yes stake descending (highest at top)
-    const frameData = candidates.map((c: string, i: number) => {
+    const frameData = candidates.map((c: string) => {
       const value = series[c][latestIdx];
       return {
         name: c,
@@ -896,7 +896,7 @@ class VotingVisualization {
       this.updateProgressIndicator(timestamps[frame]);
       
       // Build and sort data by net yes stake (yes - no) descending
-      const frameData = candidates.map((c: string, i: number) => {
+      const frameData = candidates.map((c: string) => {
         const value = series[c][frame];
         return {
           name: c,
