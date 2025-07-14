@@ -591,7 +591,7 @@ class VotingVisualization {
           });
           return shapes.length === 1 ? shapes[0] : { type: 'group', children: shapes };
         },
-        data: marimekkoData.map((_, i) => i),
+        data: marimekkoData.map((_, idx) => idx),
         encode: {},
         z: 2
       }],
@@ -707,13 +707,13 @@ class VotingVisualization {
         const voteTime = vote.timestamp;
         const startIdx = timestamps.findIndex(t => t >= voteTime);
         if (startIdx === -1) return;
-        for (let i = startIdx; i < timestamps.length; i++) {
-          if (vote.vote === 'yes') uniqueYesAtTimestamp[i].add(voterID);
-          if (vote.vote === 'no') uniqueNoAtTimestamp[i].add(voterID);
+        for (let _ = startIdx; _ < timestamps.length; _++) {
+          if (vote.vote === 'yes') uniqueYesAtTimestamp[_].add(voterID);
+          if (vote.vote === 'no') uniqueNoAtTimestamp[_].add(voterID);
         }
       });
       // Net unique votes = YES - NO
-      series[candidate] = uniqueYesAtTimestamp.map((yesSet, i) => yesSet.size - uniqueNoAtTimestamp[i].size);
+      series[candidate] = uniqueYesAtTimestamp.map((yesSet, _) => yesSet.size - uniqueNoAtTimestamp[_].size);
     });
     
     this.popularityRacingData = { timestamps, candidates, series };
