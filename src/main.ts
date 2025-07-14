@@ -382,14 +382,6 @@ class VotingVisualization {
 
 
 
-  private updateLastUpdated(): void {
-    const lastUpdatedEl = document.getElementById('last-updated');
-    if (lastUpdatedEl) {
-      const now = new Date();
-      lastUpdatedEl.textContent = now.toLocaleString();
-    }
-  }
-
   private showLoading(show: boolean): void {
     const container = document.getElementById('charts-container');
     if (!container) return;
@@ -726,63 +718,6 @@ class VotingVisualization {
     
     this.popularityRacingData = { timestamps, candidates, series };
     console.log('preparePopularityRacingData:', this.popularityRacingData);
-  }
-
-  private getCandidateColor(_name: string, index: number): string {
-    // Muted, pastel, semi-transparent palette (alpha 0.5)
-    const pastelPalette = [
-      'rgba(230, 25, 75, 0.1)',    // red
-      'rgba(60, 180, 75, 0.1)',    // green
-      'rgba(255, 225, 25, 0.1)',   // yellow
-      'rgba(67, 99, 216, 0.1)',    // blue
-      'rgba(245, 130, 48, 0.1)',   // orange
-      'rgba(145, 30, 180, 0.1)',   // purple
-      'rgba(70, 240, 240, 0.1)',   // cyan
-      'rgba(240, 50, 230, 0.1)',   // magenta
-      'rgba(188, 246, 12, 0.1)',   // lime
-      'rgba(250, 190, 190, 0.1)',  // pink
-      'rgba(0, 128, 128, 0.1)',    // teal
-      'rgba(230, 190, 255, 0.1)',  // lavender
-      'rgba(154, 99, 36, 0.1)',    // brown
-      'rgba(255, 250, 200, 0.1)',  // beige
-      'rgba(128, 0, 0, 0.1)',      // maroon
-      'rgba(170, 255, 195, 0.1)',  // mint
-      'rgba(128, 128, 0, 0.1)',    // olive
-      'rgba(255, 216, 177, 0.1)',  // apricot
-      'rgba(0, 0, 117, 0.1)',      // navy
-      'rgba(128, 128, 128, 0.1)',  // grey
-      'rgba(255, 255, 255, 0.1)',  // white
-      'rgba(0, 0, 0, 0.1)',        // black
-      'rgba(178, 34, 34, 0.1)',    // firebrick
-      'rgba(34, 139, 34, 0.1)',    // forest green
-      'rgba(255, 127, 80, 0.1)',   // coral
-      'rgba(70, 130, 180, 0.1)',   // steel blue
-      'rgba(218, 165, 32, 0.1)',   // goldenrod
-      'rgba(153, 50, 204, 0.1)',   // dark orchid
-      'rgba(0, 206, 209, 0.1)',    // dark turquoise
-      'rgba(255, 20, 147, 0.1)',   // deep pink
-      'rgba(124, 252, 0, 0.1)',    // lawn green
-      'rgba(255, 182, 193, 0.1)',  // light pink
-      'rgba(32, 178, 170, 0.1)',   // light sea green
-      'rgba(255, 99, 71, 0.1)',    // tomato
-      'rgba(138, 43, 226, 0.1)',   // blue violet
-      'rgba(0, 250, 154, 0.1)',    // medium spring green
-      'rgba(255, 140, 0, 0.1)',    // dark orange
-      'rgba(176, 224, 230, 0.1)',  // powder blue
-      'rgba(220, 20, 60, 0.1)',    // crimson
-      'rgba(0, 255, 127, 0.1)',    // spring green
-      'rgba(199, 21, 133, 0.1)',   // medium violet red
-      'rgba(189, 183, 107, 0.1)',  // dark khaki
-      'rgba(95, 158, 160, 0.1)',   // cadet blue
-      'rgba(210, 105, 30, 0.1)',   // chocolate
-      'rgba(154, 205, 50, 0.1)',   // yellow green
-      'rgba(100, 149, 237, 0.1)',  // cornflower blue 
-      'rgba(255, 69, 0, 0.1)',     // orange red
-      'rgba(46, 139, 87, 0.1)',    // sea green
-      'rgba(160, 82, 45, 0.1)',    // sienna
-      'rgba(64, 224, 208, 0.1)',   // turquoise
-    ];
-    return pastelPalette[index % pastelPalette.length];
   }
 
   private formatStake(val: number): string {
@@ -1127,11 +1062,6 @@ class VotingVisualization {
     }, 500); // Same interval as stake-weighted animation
   }
   
-  // Easing function for smoother animations
-  private easeInOutCubic(t: number): number {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  }
-
   private setupPopularVoteToggle(): void {
     const playButtonContainer = document.querySelector('#racing-bar-chart-wrapper div');
     if (!playButtonContainer) return;
