@@ -32,3 +32,4 @@ coverage/
 # Ignore custom API and page for candidate votes
 src/candidateVotesApi.ts
 src/candidateVotesPage.html 
+.vercel
