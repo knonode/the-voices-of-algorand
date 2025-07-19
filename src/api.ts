@@ -151,3 +151,33 @@ export function getLatestVotes(transactions: AlgorandTransaction[]): AlgorandTra
   // Return array of latest voting transactions (one per voter)
   return Array.from(latestVotes.values());
 }
+
+export async function fetchVotingPeriod(periodId: number = 15): Promise<{ start: number; end: number }> {
+  try {
+    const response = await fetch(`https://governance.algorand.foundation/api/periods/governance-period-15/`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Governance API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Governance API response:', data);
+    
+    if (data && data.registration_end_datetime && data.end_datetime) {
+      return {
+        start: new Date(data.registration_end_datetime).getTime(),
+        end: new Date(data.end_datetime).getTime(),
+      };
+    } else {
+      throw new Error('Invalid period data structure');
+    }
+  } catch (error) {
+    console.error('Failed to fetch voting period:', error);
+    throw error;
+  }
+}

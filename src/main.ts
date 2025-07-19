@@ -3,10 +3,34 @@ import { EChartsService } from './echartsService';
 import { PopularityChartService } from './popularityChartService';
 import { StatisticsService } from './statisticsService';
 import { Candidate, Vote } from './types';
+import { fetchVotingPeriod, parseVotingOrRegistrationNote } from './api';
 import * as echarts from 'echarts';
 import confetti from 'canvas-confetti';
 
-const GOVERNANCE_API_PERIODS_URL = 'https://governance.algorand.foundation/api/periods/active';
+// Add this helper function at the top of the file
+async function parseCSV(filePath: string): Promise<any[]> {
+  try {
+    const response = await fetch(filePath);
+    const text = await response.text();
+    const lines = text.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(',');
+    
+    return lines.slice(1).map(line => {
+      const values = line.split(',');
+      const entry: any = {};
+      headers.forEach((header, index) => {
+        entry[header.trim()] = values[index]?.trim() || '';
+      });
+      return entry;
+    });
+  } catch (error) {
+    console.warn(`Could not load CSV file ${filePath}:`, error);
+    return [];
+  }
+}
+
+// Remove this line
+// const GOVERNANCE_API_PERIODS_URL = 'https://governance.algorand.foundation/api/periods/active';
 
 class VotingVisualization {
   private votingService: VotingService;
@@ -25,6 +49,10 @@ class VotingVisualization {
   private countdownInterval: number | null = null;
   private confettiTimeout: number | null = null;
   private winnerOverlay: HTMLElement | null = null;
+  // Add this line to disable celebration features
+  private celebrationEnabled = false; // Set to true to re-enable
+  private withdrawnAddresses: Set<string> = new Set();
+  private withdrawalCorrections: Map<string, number> = new Map();
 
   constructor() {
     this.votingService = new VotingService();
@@ -51,6 +79,7 @@ class VotingVisualization {
       this.showLoading(true);
       await this.votingService.fetchAndProcessVotes();
       await this.fetchVotingPeriod();
+      await this.loadWithdrawalData(); // Load withdrawal data before preparing racing bar data
       this.prepareRacingBarData();
       this.preparePopularityRacingData(); // Add this line to prepare popularity data
       this.updateStats();
@@ -68,7 +97,11 @@ class VotingVisualization {
     const totalStakeEl = document.getElementById('total-stake');
     const uniqueVotersEl = document.getElementById('unique-voters');
     const participationRateEl = document.getElementById('participation-rate');
-    if (totalStakeEl) totalStakeEl.textContent = stats.totalStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    // stats.totalStake already has withdrawal corrections applied from the voting service
+    const finalTotalStake = stats.totalStake;
+    
+    if (totalStakeEl) totalStakeEl.textContent = finalTotalStake.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     if (uniqueVotersEl) uniqueVotersEl.textContent = `${stats.uniqueVoters.toLocaleString()}`;
     if (participationRateEl) participationRateEl.textContent = stats.participationRate.toFixed(1) + '%';
   }
@@ -110,6 +143,7 @@ class VotingVisualization {
   }
 
   private triggerCelebration(): void {
+    if (!this.celebrationEnabled) return; // Early return if disabled
     if (this.confettiTimeout) return; // Prevent multiple triggers
     // Fire a lot of confetti: explode from different locations across the window
     const burst = (originX: number, originY: number) => {
@@ -125,7 +159,7 @@ class VotingVisualization {
       this.raiseConfettiZIndex();
     };
     // Explode from random locations across the window
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 1; i++) {
       setTimeout(() => {
         for (let j = 0; j < 4; j++) {
           const x = Math.random() * 0.8 + 0.1; // avoid extreme edges
@@ -137,7 +171,7 @@ class VotingVisualization {
     // Show winner overlay after confetti
     this.confettiTimeout = window.setTimeout(() => {
       this.showWinnerOverlay();
-    }, 4500);
+    }, 500);
   }
 
   private showWinnerOverlay(): void {
@@ -153,6 +187,7 @@ class VotingVisualization {
       frameData.sort((a, b) => b.value - a.value);
       winners = frameData.slice(0, 11).map(d => d.name);
     }
+    
     // Create overlay
     const overlay = document.createElement('div');
     overlay.style.position = 'fixed';
@@ -161,52 +196,78 @@ class VotingVisualization {
     overlay.style.width = '100vw';
     overlay.style.height = '100vh';
     overlay.style.background = 'rgba(10, 11, 22, 0.98)';
-    overlay.style.zIndex = '2147483647'; // Max z-index for most browsers
+    overlay.style.zIndex = '2147483647';
     overlay.style.display = 'flex';
     overlay.style.flexDirection = 'column';
     overlay.style.alignItems = 'center';
     overlay.style.justifyContent = 'center';
-    overlay.style.gap = '2rem';
+    overlay.style.gap = '1rem';
     overlay.style.pointerEvents = 'auto';
+    overlay.style.overflow = 'auto';
+    overlay.style.padding = '1rem';
+    overlay.style.boxSizing = 'border-box';
+    
     // Title
     const title = document.createElement('div');
     title.textContent = '🏆 Council Winners! 🏆';
-    title.style.fontSize = '3rem';
+    title.style.fontSize = 'clamp(1.5rem, 5vw, 3rem)';
     title.style.color = '#FFD700';
     title.style.fontWeight = 'bold';
-    title.style.marginBottom = '2rem';
+    title.style.marginBottom = '1rem';
+    title.style.textAlign = 'center';
+    title.style.lineHeight = '1.2';
     overlay.appendChild(title);
+    
+    // Winner names container
+    const winnersContainer = document.createElement('div');
+    winnersContainer.style.display = 'flex';
+    winnersContainer.style.flexDirection = 'column';
+    winnersContainer.style.alignItems = 'center';
+    winnersContainer.style.gap = '0.5rem';
+    winnersContainer.style.maxHeight = '60vh';
+    winnersContainer.style.overflow = 'auto';
+    winnersContainer.style.padding = '0.5rem';
+    
     // Winner names
     winners.forEach((name, idx) => {
       const winnerDiv = document.createElement('div');
       winnerDiv.textContent = name;
-      winnerDiv.style.fontSize = '2.5rem';
+      winnerDiv.style.fontSize = 'clamp(1rem, 4vw, 2.5rem)';
       winnerDiv.style.color = '#FFD700';
       winnerDiv.style.fontWeight = 'bold';
       winnerDiv.style.opacity = '0';
       winnerDiv.style.transition = 'opacity 0.7s';
-      winnerDiv.style.margin = '0.5rem 0';
-      overlay.appendChild(winnerDiv);
+      winnerDiv.style.textAlign = 'center';
+      winnerDiv.style.lineHeight = '1.2';
+      winnerDiv.style.wordBreak = 'break-word';
+      winnerDiv.style.maxWidth = '90vw';
+      winnersContainer.appendChild(winnerDiv);
       setTimeout(() => {
         winnerDiv.style.opacity = '1';
       }, 500 + idx * 400);
     });
+    
+    overlay.appendChild(winnersContainer);
+    
     // Dismiss button
     const btn = document.createElement('button');
     btn.textContent = 'Close';
-    btn.style.marginTop = '3rem';
-    btn.style.fontSize = '1.5rem';
-    btn.style.padding = '1rem 2.5rem';
+    btn.style.marginTop = '1rem';
+    btn.style.fontSize = 'clamp(1rem, 3vw, 1.5rem)';
+    btn.style.padding = 'clamp(0.5rem, 2vw, 1rem) clamp(1rem, 4vw, 2.5rem)';
     btn.style.background = '#20B2AA';
     btn.style.color = '#0A0B16';
     btn.style.border = 'none';
     btn.style.borderRadius = '8px';
     btn.style.cursor = 'pointer';
+    btn.style.minHeight = '44px'; // Minimum touch target size
+    btn.style.whiteSpace = 'nowrap';
     btn.onclick = () => {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       this.winnerOverlay = null;
     };
     overlay.appendChild(btn);
+    
     document.body.appendChild(overlay);
     this.winnerOverlay = overlay;
   }
@@ -608,42 +669,73 @@ class VotingVisualization {
 
   private async fetchVotingPeriod(): Promise<void> {
     try {
-      const res = await fetch(GOVERNANCE_API_PERIODS_URL);
-      const data = await res.json();
-      console.log('Voting period API response:', data);
-      if (data && data.voting_sessions && data.voting_sessions.length > 0) {
-        this.votingPeriod = {
-          start: new Date(data.voting_sessions[0].voting_start_datetime).getTime(),
-          end: new Date(data.voting_sessions[0].voting_end_datetime).getTime(),
-        };
-      } else if (data && data.start_datetime && data.end_datetime) {
-        this.votingPeriod = {
-          start: new Date(data.start_datetime).getTime(),
-          end: new Date(data.end_datetime).getTime(),
-        };
-      } else {
-        // fallback: use current time as both start and end
-        const now = Date.now();
-        this.votingPeriod = { start: now, end: now };
-      }
-    } catch (e) {
-      console.error('Failed to fetch voting period:', e);
-      const now = Date.now();
-      this.votingPeriod = { start: now, end: now };
+      this.votingPeriod = await fetchVotingPeriod(15);
+    } catch (error) {
+      console.error('Failed to fetch voting period:', error);
+      this.votingPeriod = { 
+        start: new Date('2024-12-01T00:00:00Z').getTime(),
+        end: new Date('2024-12-31T23:59:59Z').getTime()
+      };
     }
   }
 
+  private async loadWithdrawalData(): Promise<void> {
+    try {
+      // Load the withdrawn addresses CSV
+      const withdrawnData = await parseCSV('/withdrawn-addresses.csv');
+      
+      // Create sets and maps for fast lookup
+      withdrawnData.forEach((row: any) => {
+        const address = row.Address;
+        const withdrawnAmount = parseInt(row['Total Committed Amount in Algo']);
+        this.withdrawnAddresses.add(address);
+        this.withdrawalCorrections.set(address, withdrawnAmount / 1_000_000); // Convert microAlgo to Algo
+      });
+      
+      const totalWithdrawn = Array.from(this.withdrawalCorrections.values()).reduce((sum, val) => sum + val, 0);
+      console.log(`Loaded ${this.withdrawnAddresses.size} withdrawn addresses with total ${totalWithdrawn.toLocaleString()} Algo withdrawn`);
+      console.log('Sample withdrawn addresses:', Array.from(this.withdrawnAddresses).slice(0, 5));
+      console.log('Sample withdrawal amounts:', Array.from(this.withdrawalCorrections.entries()).slice(0, 5));
+      
+      // Verify the conversion worked correctly
+      const sampleAmount = Array.from(this.withdrawalCorrections.values())[0];
+      console.log('Sample withdrawal amount (should be in Algo):', sampleAmount);
+      
+      // Check if the total matches expected ~17.54M Algo
+      const totalWithdrawnInM = totalWithdrawn / 1_000_000;
+      if (Math.abs(totalWithdrawnInM - 17.54) > 1) {
+        console.warn(`Warning: Total withdrawn amount (${totalWithdrawnInM.toFixed(2)}M) doesn't match expected ~17.54M Algo`);
+      } else {
+        console.log('✓ Total withdrawn amount matches expected ~17.54M Algo');
+      }
+      
+      // Check if any withdrawn addresses are in the voting data
+      const voterWeights = this.votingService.getVoterWeights();
+      let matchingWithdrawnVoters = 0;
+      this.withdrawnAddresses.forEach(address => {
+        if (voterWeights.has(address)) {
+          matchingWithdrawnVoters++;
+        }
+      });
+      console.log(`Found ${matchingWithdrawnVoters} withdrawn addresses that also voted out of ${this.withdrawnAddresses.size} total withdrawn`);
+    } catch (error) {
+      console.warn('Could not load withdrawal data:', error);
+    }
+  }
+
+  // Modify prepareRacingBarData to handle vote changes
   private prepareRacingBarData(): void {
     if (!this.votingPeriod) return;
     const { start, end } = this.votingPeriod;
     console.log('Voting period:', start, end, new Date(start).toLocaleString(), new Date(end).toLocaleString());
-    const votes = this.votingService.getVotes();
-    const candidates: string[] = Array.from(new Set(votes.map((v: any) => v.candidate)));
     
-    // Build more granular time buckets for longer animation
-    // Target ~200 frames for a ~60 second animation (300ms per frame)
+    // Get ALL transactions (not just latest) to track vote changes
+    const allTransactions = this.votingService.getAllTransactions(); // We need to add this method
+    const candidates: string[] = Array.from(new Set(this.votingService.getCandidates().map(c => c.name)));
+    
+    // Build time buckets
     const targetFrames = 200;
-    const interval = Math.max(Math.floor((end - start) / targetFrames), 5 * 60 * 1000); // 5 min minimum or target frames
+    const interval = Math.max(Math.floor((end - start) / targetFrames), 5 * 60 * 1000);
     const timestamps: number[] = [];
     const now = Date.now();
     for (let t = start; t <= Math.min(end, now); t += interval) {
@@ -655,23 +747,103 @@ class VotingVisualization {
     // For each candidate, build net yes stake at each timestamp
     const series: Record<string, number[]> = {};
     candidates.forEach((candidate: string) => {
+      const candidateIndex = this.votingService.getCandidates().findIndex(c => c.name === candidate);
+      if (candidateIndex === -1) return;
+      
+      // Track current votes for this candidate at each timestamp
+      const currentVotes = new Map<string, { yes: number; no: number; abstain: number }>();
+      
+      // Sort all transactions by timestamp
+      const sortedTransactions = allTransactions
+        .filter(tx => {
+          if (!tx.note) return false;
+          const parsed = parseVotingOrRegistrationNote(tx.note);
+          return parsed.type === 'voting';
+        })
+        .sort((a, b) => a['round-time'] - b['round-time']);
+      
       let yesStake = 0, noStake = 0;
-      let idx = 0;
-      const candidateVotes = votes.filter((v: any) => v.candidate === candidate).sort((a: any, b: any) => a.timestamp - b.timestamp);
-      let vIdx = 0;
+      const seriesData: number[] = [];
+      
+      // Debug: Track initial total stake for this candidate
+      let initialTotalStake = 0;
+      
       for (let t of timestamps) {
-        while (vIdx < candidateVotes.length && candidateVotes[vIdx].timestamp <= t) {
-          if (candidateVotes[vIdx].vote === 'yes') yesStake += candidateVotes[vIdx].stake;
-          if (candidateVotes[vIdx].vote === 'no') noStake += candidateVotes[vIdx].stake;
-          vIdx++;
+                 // Process all transactions up to this timestamp
+         while (sortedTransactions.length > 0 && sortedTransactions[0]['round-time'] * 1000 <= t) {
+           const tx = sortedTransactions.shift()!;
+           if (!tx.note) continue;
+           const parsed = parseVotingOrRegistrationNote(tx.note);
+           if (parsed.type !== 'voting' || !Array.isArray(parsed.data)) continue;
+          
+          const voterAddress = tx.sender;
+          const voterId = this.votingService.getVoterRegistry().getId(voterAddress);
+          // Use corrected stake from voting service (with withdrawal corrections applied)
+          const registrationStake = this.votingService.getVoterWeights().get(voterAddress) || 0;
+          const withdrawalAmount = this.withdrawalCorrections.get(voterAddress) || 0;
+          const stake = Math.max(0, registrationStake - withdrawalAmount);
+          
+          // Get vote for this specific candidate
+          const voteCode = parsed.data[candidateIndex + 1];
+          const voteType = voteCode === 'a' ? 'yes' : voteCode === 'b' ? 'no' : voteCode === 'c' ? 'abstain' : null;
+          
+          if (voteType) {
+            // Remove previous vote for this voter/candidate combination
+            const previousVote = currentVotes.get(voterAddress);
+            if (previousVote) {
+              yesStake -= previousVote.yes;
+              noStake -= previousVote.no;
+            }
+            
+            // Add new vote
+            const newVote = { yes: 0, no: 0, abstain: 0 };
+            newVote[voteType] = stake;
+            currentVotes.set(voterAddress, newVote);
+            
+            yesStake += newVote.yes;
+            noStake += newVote.no;
+            
+            // Track initial total stake (before withdrawal corrections)
+            if (initialTotalStake === 0) {
+              initialTotalStake = yesStake + noStake;
+            }
+          }
         }
-        if (!series[candidate]) series[candidate] = [];
-        series[candidate].push(yesStake - noStake);
-        idx++;
+        
+        // Withdrawal corrections are already applied to stake values above
+        
+        seriesData.push(yesStake - noStake);
+      }
+      
+      series[candidate] = seriesData;
+    });
+    
+    this.racingBarData = { timestamps, candidates, series };
+    
+    // Debug: Show total stakes at the beginning and end
+    const finalFrame = timestamps.length - 1;
+    
+    // Calculate total voting power correctly by summing unique voter stakes from final voting data
+    const uniqueVoterStakes = new Map<string, number>();
+    this.votingService.getVotes().forEach(vote => {
+      const voterAddress = this.votingService.getVoterRegistry().getAddress(vote.voter);
+      if (!uniqueVoterStakes.has(voterAddress)) {
+        uniqueVoterStakes.set(voterAddress, vote.stake);
       }
     });
-    this.racingBarData = { timestamps, candidates, series };
-    console.log('prepareRacingBarData:', this.racingBarData);
+    
+    const totalFinalStake = Array.from(uniqueVoterStakes.values()).reduce((sum, stake) => sum + stake, 0);
+    
+    // Calculate net voting power (sum of yes votes minus no votes across all candidates)
+    let totalNetVotingPower = 0;
+    candidates.forEach(candidate => {
+      totalNetVotingPower += series[candidate][finalFrame];
+    });
+    
+    console.log(`Total final eligible voter stake: ${totalFinalStake.toLocaleString()} Algo`);
+    console.log(`Final net voting power (sum of yes-no across all candidates): ${totalNetVotingPower.toLocaleString()} Algo`);
+    console.log(`Expected final total: ~77.79M Algo`);
+    console.log('prepareRacingBarData with vote changes and withdrawal corrections:', this.racingBarData);
   }
 
   private preparePopularityRacingData(): void {
@@ -776,8 +948,8 @@ class VotingVisualization {
     // Insert separator between rank 11 and 12
     const sortedCandidates = frameData.map(d => d.name);
     if (sortedCandidates.length > 11) {
-      sortedCandidates.splice(11, 0, '---COUNCIL_SEAT_CUTOFF---');
-      frameData.splice(11, 0, { name: '---COUNCIL_SEAT_CUTOFF---', value: 0, color: 'rgba(0,0,0,0.01)', stake: 0 });
+      sortedCandidates.splice(11, 0, 'cutoff');
+      frameData.splice(11, 0, { name: 'cutoff', value: 0, color: 'rgba(0,0,0,0.01)', stake: 0 });
     }
     // Find max absolute value for axis
     const maxAbs = Math.max(1, ...frameData.map(d => Math.abs(d.value)));
@@ -805,7 +977,7 @@ class VotingVisualization {
         data: frameData.map(d => ({
           value: Math.abs(d.value),
           itemStyle: {
-            color: d.name === '---COUNCIL_SEAT_CUTOFF---' ? 'rgba(0,0,0,0.01)' : d.color
+            color: d.name === 'cutoff' ? 'rgba(0,0,0,0.01)' : d.color
           },
           stake: d.stake
         })),
@@ -819,12 +991,12 @@ class VotingVisualization {
           fontWeight: 'normal',
           fontFamily: 'inherit',
           formatter: (params: any) => {
-            if (params.name === '---COUNCIL_SEAT_CUTOFF---') return '';
+            if (params.name === 'cutoff') return '';
             return `${params.data.stake >= 0 ? '' : '-'}${this.formatStake(Math.abs(params.data.stake))}`;
           }
         },
         z: 2,
-        markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
+        markLine: sortedCandidates.includes('cutoff') ? {
           symbol: ['none', 'none'],
           lineStyle: {
             color: '#096b4f',
@@ -833,7 +1005,7 @@ class VotingVisualization {
           },
           data: [
             {
-              yAxis: '---COUNCIL_SEAT_CUTOFF---',
+              yAxis: 'cutoff',
               label: { show: false }
             }
           ]
@@ -909,10 +1081,10 @@ class VotingVisualization {
       
       // Insert separator between rank 11 and 12 (council seat cutoff)
       const sortedCandidates = frameData.map(d => d.name);
-      if (sortedCandidates.length > 11 && !sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---')) {
-        sortedCandidates.splice(11, 0, '---COUNCIL_SEAT_CUTOFF---');
+      if (sortedCandidates.length > 11 && !sortedCandidates.includes('cutoff')) {
+        sortedCandidates.splice(11, 0, 'cutoff');
         frameData.splice(11, 0, {
-          name: '---COUNCIL_SEAT_CUTOFF---',
+          name: 'cutoff',
           value: 0,
           color: 'rgba(0,0,0,0.01)',
           stake: 0
@@ -944,7 +1116,7 @@ class VotingVisualization {
           data: frameData.map(d => ({
             value: Math.abs(d.value),
             itemStyle: {
-              color: d.name === '---COUNCIL_SEAT_CUTOFF---' ? 'rgba(0,0,0,0.01)' : d.color
+              color: d.name === 'cutoff' ? 'rgba(0,0,0,0.01)' : d.color
             },
             stake: d.stake
           })),
@@ -952,12 +1124,12 @@ class VotingVisualization {
             show: true,
             position: 'right',
             formatter: (params: any) => {
-              if (params.name === '---COUNCIL_SEAT_CUTOFF---') return '';
+              if (params.name === 'cutoff') return '';
               return `${params.data.stake >= 0 ? '' : '-'}${this.formatStake(Math.abs(params.data.stake))}`;
             },
             color: '#FFFFFF'
           },
-          markLine: sortedCandidates.includes('---COUNCIL_SEAT_CUTOFF---') ? {
+          markLine: sortedCandidates.includes('cutoff') ? {
             symbol: ['none', 'none'],
             lineStyle: {
               color: '#096b4f',
@@ -966,7 +1138,7 @@ class VotingVisualization {
             },
             data: [
               {
-                yAxis: '---COUNCIL_SEAT_CUTOFF---',
+                yAxis: 'cutoff',
                 label: { show: false }
               }
             ]

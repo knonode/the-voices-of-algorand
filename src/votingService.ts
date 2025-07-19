@@ -17,6 +17,21 @@ function parseCommitAmountCSV(csvText: string): Map<string, number> {
   return map;
 }
 
+function parseWithdrawalCSV(csvText: string): Map<string, number> {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const map = new Map<string, number>();
+  for (let i = 1; i < lines.length; i++) { // skip header
+    const cols = lines[i].split(',');
+    if (cols.length < 2) continue;
+    const address = cols[0].trim();
+    const amount = parseInt(cols[1].trim(), 10);
+    if (address && !isNaN(amount)) {
+      map.set(address, amount / 1_000_000); // convert microAlgos to Algos
+    }
+  }
+  return map;
+}
+
 // Add VoterRegistry for deduplication
 class VoterRegistryImpl {
   private addressToId = new Map<string, number>();
@@ -47,7 +62,10 @@ export class VotingService {
   private votes: Vote[] = [];
   private candidates: Map<string, Candidate> = new Map();
   private voterWeights: Map<string, number> = new Map();
+  private finalEligibleVoters: Map<string, number> = new Map();
+  private withdrawalData: Map<string, number> = new Map();
   private commitAmountLoaded = false;
+  private allTransactions: AlgorandTransaction[] = [];
 
   constructor() {
     this.initializeCandidates();
@@ -69,11 +87,33 @@ export class VotingService {
 
   async loadCommitAmounts(): Promise<void> {
     if (this.commitAmountLoaded) return;
+    
+    // Load registration data
     const resp = await fetch('/commit-amount.csv');
     const text = await resp.text();
     this.voterWeights = parseCommitAmountCSV(text);
+    
+    // Load final eligible voters for correct count
+    const finalResp = await fetch('/governance-period-15-eligible-governors-2025-07-15-16-14.csv');
+    const finalText = await finalResp.text();
+    this.finalEligibleVoters = parseCommitAmountCSV(finalText);
+    
+    // Load withdrawal data
+    const withdrawalResp = await fetch('/withdrawn-addresses.csv');
+    const withdrawalText = await withdrawalResp.text();
+    this.withdrawalData = parseWithdrawalCSV(withdrawalText);
+    
     this.commitAmountLoaded = true;
     console.log(`Loaded ${this.voterWeights.size} voter weights from commit-amount.csv`);
+    console.log(`Loaded ${this.finalEligibleVoters.size} final eligible voters`);
+    console.log(`Loaded ${this.withdrawalData.size} withdrawn addresses`);
+    
+    // Debug: Calculate total withdrawn amount
+    let totalWithdrawn = 0;
+    this.withdrawalData.forEach(amount => {
+      totalWithdrawn += amount;
+    });
+    console.log(`Total withdrawn amount: ${totalWithdrawn.toFixed(2)} Algo`);
   }
 
   private parseTransaction(tx: AlgorandTransaction): Vote[] {
@@ -116,6 +156,7 @@ export class VotingService {
       console.log('Commit amounts loaded successfully');
       console.log('Fetching voting transactions...');
       const transactions = await fetchVotingAccountTransactions();
+      this.allTransactions = transactions; // Store all transactions
       console.log(`Found ${transactions.length} transactions`);
 
       // voterWeights is now loaded from CSV, do not overwrite
@@ -130,12 +171,19 @@ export class VotingService {
       }
       console.log(`Parsed ${parsedVotes.length} voting transactions`);
 
-      // Assign registration weights to votes
-      this.votes = parsedVotes.map(vote => ({
-        ...vote,
-        stake: this.voterWeights.get(VoterRegistry.getAddress(vote.voter)) || 0
-      }));
-      console.log(`Assigned stakes to ${this.votes.length} votes`);
+      // Assign registration weights to votes and apply withdrawal corrections
+      this.votes = parsedVotes.map(vote => {
+        const voterAddress = VoterRegistry.getAddress(vote.voter);
+        const registrationStake = this.voterWeights.get(voterAddress) || 0;
+        const withdrawalAmount = this.withdrawalData.get(voterAddress) || 0;
+        const correctedStake = Math.max(0, registrationStake - withdrawalAmount);
+        
+        return {
+          ...vote,
+          stake: correctedStake
+        };
+      });
+      console.log(`Assigned stakes to ${this.votes.length} votes with withdrawal corrections`);
 
       // Update candidate data
       this.updateCandidateData();
@@ -190,27 +238,25 @@ export class VotingService {
   getVotingStats(): VotingStats {
     const totalVotes = this.votes.length;
     
-    // Calculate total stake from unique voters only
-    const uniqueVoterStakes = new Set<string>();
+    // Calculate total stake from ALL eligible voters (not just those who voted)
     let totalStake = 0;
-    
-    this.votes.forEach(vote => {
-      const voterAddress = VoterRegistry.getAddress(vote.voter);
-      if (!uniqueVoterStakes.has(voterAddress)) {
-        uniqueVoterStakes.add(voterAddress);
-        totalStake += vote.stake;
-      }
+    this.finalEligibleVoters.forEach((registrationStake, address) => {
+      const withdrawalAmount = this.withdrawalData.get(address) || 0;
+      const correctedStake = Math.max(0, registrationStake - withdrawalAmount);
+      totalStake += correctedStake;
     });
     
-    const uniqueVoters = new Set(this.votes.map(v => v.voter)).size;
+    const votersWhoVoted = new Set(this.votes.map(v => v.voter)).size;
+    const totalRegisteredVoters = this.voterWeights.size; // Total registered voters (2162)
+    const totalFinalEligibleVoters = this.finalEligibleVoters.size; // Final eligible voters (1394)
     
     // Calculate participation rate based on registered voters
-    const participationRate = this.voterWeights.size > 0 ? (uniqueVoters / this.voterWeights.size) * 100 : 0;
+    const participationRate = totalRegisteredVoters > 0 ? (votersWhoVoted / totalRegisteredVoters) * 100 : 0;
 
     return {
       totalVotes,
       totalStake,
-      uniqueVoters,
+      uniqueVoters: totalFinalEligibleVoters, // Show final eligible voters (1394)
       participationRate: Math.min(participationRate, 100)
     };
   }
@@ -225,6 +271,10 @@ export class VotingService {
 
   getVoterRegistry() {
     return VoterRegistry;
+  }
+
+  getAllTransactions(): AlgorandTransaction[] {
+    return this.allTransactions;
   }
 
   // Helper method to truncate account addresses for display

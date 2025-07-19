@@ -12,7 +12,7 @@ export const CANDIDATES = [
     address: "patrick.algo"
   },
   {
-    name: "Scott Bolasevich aka Flipping",
+    name: "Scott Bolasevich",
     address: "7EISH72TGOIOMBHON3G5LE3HIZYORQL5R3KLKPI22YRGLW44JUW4UDNFGA"
   },
   {
@@ -44,7 +44,7 @@ export const CANDIDATES = [
     address: "KXK5TLUOTPXI36YJXMGDHGONH2CXAHPRU5ZPQRFFAYVKBAFNWGOOAUDMZE"
   },
   {
-    name: "Mohamed Majdalawieh aka Angel of Ares",
+    name: "Mohamed Majdalawieh",
     address: "IEDYR4YZTV22AZW7Q4UILNMHJN256MBBYOSKUK6RD6DSL5JSM46DTYJQKU"
   },
   {
@@ -64,11 +64,11 @@ export const CANDIDATES = [
     address: "YKTO4C2WAC2BSMJMYKM43YCGUYHU3XHAHAYG6UUSF3BLOF6VMGRXKYB7ZU"
   },
   {
-    name: "Nicholas Shellabarger aka Shelly",
+    name: "Nicholas Shellabarger",
     address: "7UBGYVIHJKBIDSVZABRZSGAMN55HZSBX4MK3VBCHVM6F7OIWSGEN3Z75L4"
   },
   {
-    name: "Ľudovít Scholtz aka Everyday Algonaut",
+    name: "Ľudovít Scholtz",
     address: "ALGONAUTSPIUHDCX3SLFXOFDUKOE4VY36XV4JX2JHQTWJNKVBKPEBQACRY"
   },
   {
