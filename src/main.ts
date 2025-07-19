@@ -669,7 +669,7 @@ class VotingVisualization {
 
   private async fetchVotingPeriod(): Promise<void> {
     try {
-      this.votingPeriod = await fetchVotingPeriod(15);
+      this.votingPeriod = await fetchVotingPeriod();
     } catch (error) {
       console.error('Failed to fetch voting period:', error);
       this.votingPeriod = { 
@@ -777,7 +777,6 @@ class VotingVisualization {
            if (parsed.type !== 'voting' || !Array.isArray(parsed.data)) continue;
           
           const voterAddress = tx.sender;
-          const voterId = this.votingService.getVoterRegistry().getId(voterAddress);
           // Use corrected stake from voting service (with withdrawal corrections applied)
           const registrationStake = this.votingService.getVoterWeights().get(voterAddress) || 0;
           const withdrawalAmount = this.withdrawalCorrections.get(voterAddress) || 0;

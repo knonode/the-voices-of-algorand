@@ -152,7 +152,7 @@ export function getLatestVotes(transactions: AlgorandTransaction[]): AlgorandTra
   return Array.from(latestVotes.values());
 }
 
-export async function fetchVotingPeriod(periodId: number = 15): Promise<{ start: number; end: number }> {
+export async function fetchVotingPeriod(): Promise<{ start: number; end: number }> {
   try {
     const response = await fetch(`https://governance.algorand.foundation/api/periods/governance-period-15/`, {
       headers: {
